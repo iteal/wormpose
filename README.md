@@ -4,6 +4,7 @@
 [![PyPI version](https://badge.fury.io/py/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
 [![Build Status](https://travis-ci.org/iteal/wormpose.svg?branch=master)](https://travis-ci.org/iteal/wormpose)
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
+[![DOI](https://zenodo.org/badge/246706178.svg)](https://zenodo.org/badge/latestdoi/246706178)
 [![Maintainability](https://img.shields.io/codeclimate/maintainability/iteal/wormpose)](https://codeclimate.com/github/iteal/wormpose/maintainability)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
