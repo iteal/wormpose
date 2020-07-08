@@ -1,0 +1,66 @@
+language: python
+
+branches:
+  only:
+    - master
+    - develop
+
+python:
+  - 3.6
+  - 3.7
+  - 3.8
+
+before_install:
+  - python --version
+  - pip install -U pip --upgrade
+  - pip install -U setuptools --upgrade
+
+install:
+  - pip install -r requirements.txt
+  - pip install -e .
+  - pip install -e examples/toy_dataset
+
+script:
+  - wormpose -v
+  - PYTHONHASHSEED=0 wormpose calibrate toy toy_data  --random_seed 123
+  - PYTHONHASHSEED=0 wormpose datagen toy toy_data --num_train_samples 200 --num_eval_samples 200 --random_seed 123
+  - PYTHONHASHSEED=0 wormpose train toy_data --epochs 1 --random_seed 123
+  - PYTHONHASHSEED=0 wormpose predict toy_data --score_threshold 0.0 --random_seed 123
+  - wormpose postprocess toy_data
+  - wormpose viz toy_data
+  - PYTHONHASHSEED=0 wormpose evaluate toy_data --num_samples 10  --random_seed 123
+  - wormpose export toy_data
+
+stages:
+  - formatting
+  - test
+  - docs
+
+jobs:
+  include:
+    - stage: formatting
+      python: 3.6
+      install:
+        - pip install -r requirements_dev.txt
+      script: black --check wormpose
+    - stage: docs
+      python: 3.6
+      addons:
+        apt:
+          packages:
+            - pandoc
+      install:
+        - pip install -r requirements.txt
+        - pip install -r requirements_dev.txt
+      script:
+        - pandoc examples/toy_dataset/README.md -o docs/source/custom_loader.rst
+        - pandoc README.md -o readme.rst && cat readme.rst docs/_templates/contents.rst >> docs/source/index.rst
+        - cd docs && make html
+      deploy:
+        provider: pages
+        skip_cleanup: true
+        github_token: $GITHUB_TOKEN
+        on:
+          branch: master
+        local_dir: docs/build/html/
+

@@ -1,0 +1,5 @@
+tensorflow==2.2.0
+opencv-python==4.3.0.36
+numpy==1.19.0
+h5py==2.10.0
+scipy==1.4.1
