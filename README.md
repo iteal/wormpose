@@ -26,3 +26,9 @@ This notebook goes over the whole WormPose pipeline with some sample data and an
 
 ## Read the documentation
 Check the [Documentation website](https://iteal.github.io/wormpose/index.html) for detailed instructions.
+
+## Read the paper
+*WormPose: Image synthesis and convolutional networks for pose estimation in C. elegans*  
+Laetitia Hebert, Tosif Ahamed, Antonio C. Costa, Liam O’Shaugnessy, Greg J. Stephens  
+bioRxiv 2020.07.09.193755; doi: https://doi.org/10.1101/2020.07.09.193755
+
