@@ -167,6 +167,12 @@ def main():
     )
     parser.add_argument("--temp_dir", type=str, help="Where to store temporary intermediate results")
     parser.add_argument("--work_dir", type=str, help="Root folder for all experiments")
+    parser.add_argument(
+        "--no_draw_original",
+        dest="draw_original",
+        action="store_false",
+        help="If set, don't draw the original skeleton on the result image",
+    )
     add_config_argument(parser)
     args = parser.parse_args()
 
