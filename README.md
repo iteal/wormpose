@@ -10,6 +10,7 @@
 
 ![](https://i.imgur.com/l76dxbM.gif)
 ![](https://i.imgur.com/4b8zz68.gif)
+![](https://i.imgur.com/e4oox2p.gif)
 
 <sub>Results videos adapted from [Open Worm Movement Database](http://movement.openworm.org/) license [CC 4.0](https://creativecommons.org/licenses/by/4.0/legalcode) </sub>
 
