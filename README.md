@@ -8,6 +8,7 @@
 [![Maintainability](https://img.shields.io/codeclimate/maintainability/iteal/wormpose)](https://codeclimate.com/github/iteal/wormpose/maintainability)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+![](https://i.imgur.com/l76dxbM.gif)
 ![](https://i.imgur.com/4b8zz68.gif)
 
 <sub>Results videos adapted from [Open Worm Movement Database](http://movement.openworm.org/) license [CC 4.0](https://creativecommons.org/licenses/by/4.0/legalcode) </sub>
