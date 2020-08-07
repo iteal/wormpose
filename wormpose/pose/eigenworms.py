@@ -25,7 +25,7 @@ def theta_to_modes(theta: np.ndarray, eigenworms_matrix: np.ndarray) -> np.ndarr
     :param eigenworms_matrix:
     :return: the modes corresponding to the angles
     """
-    return eigenworms_matrix.dot(theta - np.mean(theta))
+    return (theta - np.mean(theta)).dot(eigenworms_matrix)
 
 
 def modes_to_theta(modes: np.ndarray, eigenworms_matrix: np.ndarray) -> np.ndarray:
