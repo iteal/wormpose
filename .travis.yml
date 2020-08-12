@@ -23,7 +23,7 @@ install:
 
 script:
   - wormpose -v
-  - coverage run --source wormpose -m pytest tests & coverage report
+  - coverage run --source wormpose -m pytest tests && coverage report
   - PYTHONHASHSEED=0 wormpose calibrate toy toy_data  --random_seed 123
   - PYTHONHASHSEED=0 wormpose datagen toy toy_data --num_train_samples 200 --num_eval_samples 200 --random_seed 123
   - PYTHONHASHSEED=0 wormpose train toy_data --epochs 1 --random_seed 123
