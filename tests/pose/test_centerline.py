@@ -7,6 +7,7 @@ from wormpose.pose.centerline import (
     skeleton_to_angle,
     skeletons_to_angles,
     interpolate_skeleton,
+    calculate_skeleton,
 )
 
 
@@ -114,4 +115,32 @@ def test_interpolate_skeleton():
 
     for input_a, input_b, expected_output in input_outputs:
         output = interpolate_skeleton(input_a, input_b)
+        assert np.allclose(expected_output, output, atol=1e-5, equal_nan=True)
+
+
+def test_calculate_skeleton():
+
+    dims = 10
+
+    input_outputs = [
+        (np.full(dims, np.nan), np.nan, np.full((dims, 2), np.nan),),
+        (
+            np.zeros(dims, dtype=float),
+            25,
+            np.array([np.linspace(-25 / 2.0, 25 / 2.0, dims), np.zeros(dims, dtype=float)]).T,
+        ),
+        (
+            np.full(dims, np.pi / 2, dtype=float),
+            50,
+            np.array([np.zeros(dims, dtype=float), np.linspace(-50 / 2.0, 50 / 2.0, dims)]).T,
+        ),
+        (
+            np.full(dims, np.pi / 4, dtype=float),
+            20 * np.sqrt(2),
+            np.array([np.linspace(-10, 10, dims), np.linspace(-10, 10, dims)]).T,
+        ),
+    ]
+
+    for input_a, input_b, expected_output in input_outputs:
+        output = calculate_skeleton(input_a, input_b)
         assert np.allclose(expected_output, output, atol=1e-5, equal_nan=True)
