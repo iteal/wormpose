@@ -1,5 +1,4 @@
 import numpy as np
-
 import pytest
 
 from wormpose.pose.eigenworms import load_eigenworms_matrix, modes_to_theta, theta_to_modes
