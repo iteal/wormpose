@@ -53,9 +53,9 @@ class CenterlineAccuracyCheck(object):
 
         # Crop the synthetic image to the object of interest before doing the image comparison,
         # we don't need the full image with all the background, still keep a little padding around the worm.
-        left, right, bottom, top = fit_bounding_box_to_worm(self.last_synth_image, cur_bg_color)
-        np.subtract(synth_skel, (bottom, left), out=synth_skel)
-        cropped_synth_image = self.last_synth_image[left:right, bottom:top]
+        bounding_box = fit_bounding_box_to_worm(self.last_synth_image, cur_bg_color)
+        np.subtract(synth_skel, (bounding_box[1].start, bounding_box[0].start), out=synth_skel)
+        cropped_synth_image = self.last_synth_image[bounding_box]
 
         # Perform the image comparison between the real image and the reconstructed synthetic image cropped.
         # This gives a heat map, we are interested in the maximum value of the heatmap and its location.

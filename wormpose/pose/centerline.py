@@ -32,7 +32,6 @@ def calculate_skeleton(
     np.cumsum(
         [centerline_section_length * np.cos(theta), centerline_section_length * np.sin(theta),], axis=1, out=out.T,
     )
-
     # center the skeleton coordinates in the middle of an image canvas (or center around zero by default)
     out += -np.min(out, axis=0) + (canvas_width_height - (np.max(out, axis=0) - np.min(out, axis=0))) / 2
 
