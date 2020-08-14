@@ -17,11 +17,13 @@ before_install:
 
 install:
   - pip install -r requirements.txt
+  - pip install -r requirements_dev.txt
   - pip install -e .
   - pip install -e examples/toy_dataset
 
 script:
   - wormpose -v
+  - coverage run --source wormpose -m pytest tests && coverage report
   - PYTHONHASHSEED=0 wormpose calibrate toy toy_data  --random_seed 123
   - PYTHONHASHSEED=0 wormpose datagen toy toy_data --num_train_samples 200 --num_eval_samples 200 --random_seed 123
   - PYTHONHASHSEED=0 wormpose train toy_data --epochs 1 --random_seed 123

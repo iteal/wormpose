@@ -11,8 +11,8 @@ from scipy.interpolate import interp1d
 def calculate_skeleton(
     theta: np.ndarray,
     worm_length: float,
+    canvas_width_height: Tuple[int, int] = (0, 0),
     out: Optional[np.ndarray] = None,
-    canvas_width_height: Optional[Tuple[int, int]] = None,
 ) -> np.ndarray:
     """
     Calculates (x,y) coordinates of the worm centerline from the tangent angle (theta) vector
@@ -32,10 +32,8 @@ def calculate_skeleton(
     np.cumsum(
         [centerline_section_length * np.cos(theta), centerline_section_length * np.sin(theta),], axis=1, out=out.T,
     )
-
-    # optional center the skeleton coordinates in the middle of an image canvas
-    if canvas_width_height is not None:
-        out += -np.min(out, axis=0) + (canvas_width_height - (np.max(out, axis=0) - np.min(out, axis=0))) / 2
+    # center the skeleton coordinates in the middle of an image canvas (or center around zero by default)
+    out += -np.min(out, axis=0) + (canvas_width_height - (np.max(out, axis=0) - np.min(out, axis=0))) / 2
 
     return out
 
