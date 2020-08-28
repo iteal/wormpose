@@ -17,7 +17,7 @@
 
 ## Overview
 
-The WormPose package estimates the challenging poses of C. elegans (coiled, blurred etc.) in videos where the simple non coiled frames are already labeled. 
+The WormPose package estimates the challenging poses of C. elegans in videos including coils and overlaps. 
 
 We train a convolutional neural network with synthetic worm images so that there is no need for human annotated labels. 
 
