@@ -170,8 +170,8 @@ class SyntheticDataGenerator(object):
 
     def _split_data(self, num_samples_per_process):
         """
-         Split a subset of template frames and associated features from different videos randomly to several processes
-         """
+        Split a subset of template frames and associated features from different videos randomly to several processes
+        """
         for process_index in range(self.num_process):
 
             num_samples = num_samples_per_process[process_index]
@@ -188,11 +188,15 @@ class SyntheticDataGenerator(object):
             templates_chunk_data = _TemplatesChunkData(num_total_templates=num_total_templates)
 
             for video_name, cur_video_template_indexes, cur_video_num_templates in zip(
-                self.video_names, self._all_template_indexes, actual_num_templates_per_video,
+                self.video_names,
+                self._all_template_indexes,
+                actual_num_templates_per_video,
             ):
                 # Select randomly some template indexes for each video
                 template_indexes = np.random.choice(
-                    cur_video_template_indexes, size=cur_video_num_templates, replace=False,
+                    cur_video_template_indexes,
+                    size=cur_video_num_templates,
+                    replace=False,
                 )
                 # Fill in the templates data chunk for this video
                 with self.dataset.frames_dataset.open(video_name) as frames:

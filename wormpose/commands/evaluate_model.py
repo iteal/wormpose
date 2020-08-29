@@ -175,13 +175,20 @@ def evaluate(dataset_path: str, **kwargs):
     )
 
     pkl_filenames = _generate_synthetic_data(
-        dataset, args.num_process, args.num_samples, args.postures_generation, args.temp_dir, args.random_seed,
+        dataset,
+        args.num_process,
+        args.num_samples,
+        args.postures_generation,
+        args.temp_dir,
+        args.random_seed,
     )
 
     keras_model = tf.keras.models.load_model(args.model_path, compile=False)
 
     tf_dataset = tf.data.Dataset.from_generator(
-        partial(_eval_data_gen, pkl_filenames), tf.float32, tf.TensorShape(dataset.image_shape + (1,)),
+        partial(_eval_data_gen, pkl_filenames),
+        tf.float32,
+        tf.TensorShape(dataset.image_shape + (1,)),
     ).batch(args.batch_size)
 
     network_predictions = keras_model.predict(tf_dataset)[: args.num_samples]
@@ -193,7 +200,8 @@ def evaluate(dataset_path: str, **kwargs):
         temp_dir=args.temp_dir,
         image_shape=dataset.image_shape,
     )(
-        results=shuffled_results, scoring_data_manager=_ScoringDataManager(pkl_filenames),
+        results=shuffled_results,
+        scoring_data_manager=_ScoringDataManager(pkl_filenames),
     )
     # Keep the maximum score between the two head/tail options for this evaluation
     image_scores = np.max(shuffled_results.scores, axis=1)
@@ -267,10 +275,13 @@ def main():
     )
     parser.add_argument("--work_dir", type=str, help="Root folder for all experiments")
     parser.add_argument(
-        "--num_samples", type=int, help="How many synthetic samples to evaluate the model with",
+        "--num_samples",
+        type=int,
+        help="How many synthetic samples to evaluate the model with",
     )
     parser.add_argument(
-        "--eigenworms_matrix_path", help="Path to optional eigenworms matrix to also calculate mode error",
+        "--eigenworms_matrix_path",
+        help="Path to optional eigenworms matrix to also calculate mode error",
     )
     add_config_argument(parser)
     parser.add_argument("--temp_dir", type=str, help="Where to store temporary intermediate results")

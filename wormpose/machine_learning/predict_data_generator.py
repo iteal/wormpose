@@ -68,7 +68,12 @@ def _assemble_images_batch(
 
 class PredictDataGenerator(object):
     def __init__(
-        self, dataset: Dataset, num_process: int, temp_dir: str, image_shape, batch_size: int,
+        self,
+        dataset: Dataset,
+        num_process: int,
+        temp_dir: str,
+        image_shape,
+        batch_size: int,
     ):
         self.dataset = dataset
         self.num_process = num_process

@@ -143,7 +143,10 @@ def _make_continuous_partitions(
         else:
             last_valid_index = np.where(~np.any(prev_theta.mask, axis=1))[0][-1]
             dists = [
-                angle_distance(shuffled_results.theta[frame_index, k, :], prev_theta[last_valid_index],)
+                angle_distance(
+                    shuffled_results.theta[frame_index, k, :],
+                    prev_theta[last_valid_index],
+                )
                 for k in range(2)
             ]
             partition = int(np.argmin(dists))
@@ -222,7 +225,9 @@ def _align_unlabelled_segments_with_adjacents(segments, segments_alignment, part
         # we first pick the best candidate segment to align (there are known frames nearby before or after or both)
         all_gaps = [
             _calculate_smallest_gap_to_adjacent(
-                segment_index=x, segments=segments, segments_alignment=segments_alignment,
+                segment_index=x,
+                segments=segments,
+                segments_alignment=segments_alignment,
             )
             for x in unaligned
         ]
@@ -263,13 +268,18 @@ def _init_unified_series(mixed_series):
 
 
 def resolve_head_tail(
-    shuffled_results: ShuffledResults, original_results: OriginalResults, frame_rate: float, score_threshold,
+    shuffled_results: ShuffledResults,
+    original_results: OriginalResults,
+    frame_rate: float,
+    score_threshold,
 ) -> BaseResults:
     len_series = len(shuffled_results)
 
     # Create continuous segments without jumps
     partitioned_results = _make_continuous_partitions(
-        score_threshold=score_threshold, frame_rate=frame_rate, shuffled_results=shuffled_results,
+        score_threshold=score_threshold,
+        frame_rate=frame_rate,
+        shuffled_results=shuffled_results,
     )
     segments = partitioned_results.get_segments()
 

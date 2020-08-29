@@ -17,7 +17,9 @@ class RealDataset(object):
     """
 
     def __init__(
-        self, frame_preprocessing: BaseFramePreprocessing, output_image_shape: Tuple[int, int],
+        self,
+        frame_preprocessing: BaseFramePreprocessing,
+        output_image_shape: Tuple[int, int],
     ):
         """
 

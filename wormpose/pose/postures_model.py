@@ -20,7 +20,10 @@ class PosturesModel(object):
     def __init__(self):
 
         model_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), os.pardir, "resources", "postures_model.json.gz",
+            os.path.dirname(os.path.abspath(__file__)),
+            os.pardir,
+            "resources",
+            "postures_model.json.gz",
         )
 
         with gzip.open(model_path, "rt") as f:

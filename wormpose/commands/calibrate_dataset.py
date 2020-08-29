@@ -60,7 +60,12 @@ class _ImagesAndScoresWriter(_ScoresWriter):
 
 class _Calibrator(object):
     def __init__(
-        self, dataset: Dataset, results_dir: str, image_shape: Tuple[int, int], num_samples: int, theta_dims: int,
+        self,
+        dataset: Dataset,
+        results_dir: str,
+        image_shape: Tuple[int, int],
+        num_samples: int,
+        theta_dims: int,
     ):
         self.dataset = dataset
         self.results_dir = results_dir
@@ -77,7 +82,8 @@ class _Calibrator(object):
         labelled_indexes = features.labelled_indexes
 
         centerline_accuracy = CenterlineAccuracyCheck(
-            frame_preprocessing=self.dataset.frame_preprocessing, image_shape=self.image_shape,
+            frame_preprocessing=self.dataset.frame_preprocessing,
+            image_shape=self.image_shape,
         )
 
         with self.dataset.frames_dataset.open(video_name) as frames:

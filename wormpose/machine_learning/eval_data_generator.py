@@ -18,7 +18,12 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def generate(dataset: Dataset, num_samples: int, theta_dims: int, file_pattern: str,) -> int:
+def generate(
+    dataset: Dataset,
+    num_samples: int,
+    theta_dims: int,
+    file_pattern: str,
+) -> int:
     """
     Generates evaluation dataset composed of processed real images, saved to a .TFrecord
 

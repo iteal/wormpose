@@ -57,8 +57,8 @@ class BaseFramesDataset(ABC):
 
 class BaseFeaturesDataset(ABC):
     """
-     Specific code to the dataset to access the features for each video of the dataset
-     """
+    Specific code to the dataset to access the features for each video of the dataset
+    """
 
     @abstractmethod
     def get_features(self, video_name: str) -> dict:

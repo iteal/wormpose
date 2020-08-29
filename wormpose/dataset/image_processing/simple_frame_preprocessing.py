@@ -24,5 +24,8 @@ class SimpleFramePreprocessing(BaseFramePreprocessing):
 
     def process(self, frame: np.ndarray, background_threshold: Optional[int] = None) -> Tuple[np.ndarray, int]:
         return segment_foreground(
-            frame, self.foreground_close_struct_element, self.foreground_dilate_struct_element, self.threshold_fn,
+            frame,
+            self.foreground_close_struct_element,
+            self.foreground_dilate_struct_element,
+            self.threshold_fn,
         )

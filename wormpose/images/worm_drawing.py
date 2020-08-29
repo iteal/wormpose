@@ -35,7 +35,9 @@ def make_draw_worm_body(body_color: int = 255) -> Callable:
         # draw two circles at the extremities
         _draw_extremity(img, skeleton[0], worm_thickness[0])
         _draw_extremity(
-            img, skeleton[num_centerline_joints - 1], worm_thickness[num_centerline_joints - 1],
+            img,
+            skeleton[num_centerline_joints - 1],
+            worm_thickness[num_centerline_joints - 1],
         )
 
         rx, ry = skeleton[:, 0], skeleton[:, 1]
@@ -102,7 +104,10 @@ def draw_width_circle(image: np.ndarray, center, width: float, color):
     Draw a circle on top of an image to represent the worm width
     """
     cv2.circle(
-        image, center=(int(center[0]), int(center[1])), radius=int(width / 2), color=color,
+        image,
+        center=(int(center[0]), int(center[1])),
+        radius=int(width / 2),
+        color=color,
     )
 
 

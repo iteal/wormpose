@@ -29,13 +29,20 @@ class CenterlineAccuracyCheck(object):
         self.real_dataset = RealDataset(frame_preprocessing=frame_preprocessing, output_image_shape=image_shape)
 
         self.synthetic_dataset = SyntheticDataset(
-            frame_preprocessing=frame_preprocessing, output_image_shape=image_shape, enable_random_augmentations=False,
+            frame_preprocessing=frame_preprocessing,
+            output_image_shape=image_shape,
+            enable_random_augmentations=False,
         )
         self.last_synth_image = np.empty(image_shape, np.uint8)
         self.last_real_image = None
 
     def __call__(
-        self, theta, template_skeleton, template_frame, template_measurements, real_frame_orig,
+        self,
+        theta,
+        template_skeleton,
+        template_frame,
+        template_measurements,
+        real_frame_orig,
     ):
         if np.any(np.isnan(theta)):
             score = np.nan

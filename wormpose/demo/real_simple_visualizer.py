@@ -20,7 +20,8 @@ class RealSimpleVisualizer(object):
 
         self.video_name = video_name if video_name is not None else dataset.video_names[0]
         self.real_dataset = RealDataset(
-            frame_preprocessing=dataset.frame_preprocessing, output_image_shape=dataset.image_shape,
+            frame_preprocessing=dataset.frame_preprocessing,
+            output_image_shape=dataset.image_shape,
         )
         self.frames_dataset = dataset.frames_dataset
 
@@ -39,7 +40,9 @@ def main():
     parser.add_argument("dataset_loader", type=str)
     parser.add_argument("dataset_path", type=str)
     parser.add_argument(
-        "--video_name", type=str, help="Optional video name. If not set, only visualize one video.",
+        "--video_name",
+        type=str,
+        help="Optional video name. If not set, only visualize one video.",
     )
     add_resizing_arguments(parser)
     args = parser.parse_args()

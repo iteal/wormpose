@@ -48,7 +48,9 @@ def _make_tf_dataset(data_generator, batch_size: int, image_shape):
     def run(video_name):
         data_gen = partial(data_generator.run, video_name=video_name)
         tf_dset = tf.data.Dataset.from_generator(
-            data_gen, tf.float32, tf.TensorShape([batch_size, image_shape[0], image_shape[1], 1]),
+            data_gen,
+            tf.float32,
+            tf.TensorShape([batch_size, image_shape[0], image_shape[1], 1]),
         )
         return tf_dset
 
@@ -76,7 +78,11 @@ class _Predictor(object):
         self.results_scoring = results_scoring
 
     def __call__(
-        self, num_frames: int, input_frames, scoring_data_manager: BaseScoringDataManager, features: Features,
+        self,
+        num_frames: int,
+        input_frames,
+        scoring_data_manager: BaseScoringDataManager,
+        features: Features,
     ) -> Tuple[OriginalResults, ShuffledResults]:
         # run all frames through the neural network to get a result theta without head/tail decision
         network_predictions = self.keras_model.predict(input_frames)[:num_frames]
@@ -210,12 +216,18 @@ def predict(dataset_path: str, **kwargs):
             num_frames=dataset.num_frames(video_name),
             features=features,
             scoring_data_manager=ScoringDataManager(
-                video_name=video_name, frames_dataset=dataset.frames_dataset, features=features,
+                video_name=video_name,
+                frames_dataset=dataset.frames_dataset,
+                features=features,
             ),
         )
 
         results = {"original": original_results, "unaligned": shuffled_results}
-        if _can_resolve_results(shuffled_results, video_name=video_name, score_threshold=args.score_threshold,):
+        if _can_resolve_results(
+            shuffled_results,
+            video_name=video_name,
+            score_threshold=args.score_threshold,
+        ):
             final_results = resolve_head_tail(
                 shuffled_results=shuffled_results,
                 original_results=original_results,
@@ -240,7 +252,9 @@ def main():
 
     # model infos
     parser.add_argument(
-        "--model_path", type=str, help="Load model from this path, or use best model from work_dir.",
+        "--model_path",
+        type=str,
+        help="Load model from this path, or use best model from work_dir.",
     )
     parser.add_argument("--batch_size", type=int)
 

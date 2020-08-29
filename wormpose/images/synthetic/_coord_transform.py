@@ -52,13 +52,24 @@ def make_calc_all_coords(nb_skeleton_joints: int, enable_random_augmentations: b
     calc_one_segment_coords = _make_calc_one_segment_coords()
 
     def _update_coords(
-        width, index_to_update, template_joint_a, template_joint_b, target_joint_a, target_joint_b,
+        width,
+        index_to_update,
+        template_joint_a,
+        template_joint_b,
+        target_joint_a,
+        target_joint_b,
     ):
         calc_one_segment_coords(
-            joint_a=template_joint_a, joint_b=template_joint_b, width=width, dest=template_coords[index_to_update],
+            joint_a=template_joint_a,
+            joint_b=template_joint_b,
+            width=width,
+            dest=template_coords[index_to_update],
         )
         calc_one_segment_coords(
-            joint_a=target_joint_a, joint_b=target_joint_b, width=width, dest=target_coords[index_to_update],
+            joint_a=target_joint_a,
+            joint_b=target_joint_b,
+            width=width,
+            dest=target_coords[index_to_update],
         )
 
     def run(template_skel, target_skel, target_worm_thickness):

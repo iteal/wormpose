@@ -78,7 +78,10 @@ def load_dataset(
             frame_preprocessing_class = module.FramePreprocessing
 
             frames_dataset, features_dataset, video_names = _load_dataset(
-                frames_dataset_class, features_dataset_class, dataset_path, selected_video_names,
+                frames_dataset_class,
+                features_dataset_class,
+                dataset_path,
+                selected_video_names,
             )
 
             frame_preprocessing = frame_preprocessing_class()
@@ -92,10 +95,14 @@ def load_dataset(
                         frames_dataset_class, resize_factor=resize_options.resize_factor
                     )
                     features_dataset_class = features_dataset_resizer(
-                        features_dataset_class, resize_factor=resize_options.resize_factor,
+                        features_dataset_class,
+                        resize_factor=resize_options.resize_factor,
                     )
                     frames_dataset, features_dataset, video_names = _load_dataset(
-                        frames_dataset_class, features_dataset_class, dataset_path, selected_video_names,
+                        frames_dataset_class,
+                        features_dataset_class,
+                        dataset_path,
+                        selected_video_names,
                     )
                     image_shape = resize_options.get_image_shape(features_dataset)
 
@@ -116,7 +123,10 @@ def load_dataset(
 
 
 def _load_dataset(
-    frames_dataset_class, features_dataset_class, dataset_path: str, selected_video_names,
+    frames_dataset_class,
+    features_dataset_class,
+    dataset_path: str,
+    selected_video_names,
 ):
     frames_dataset = frames_dataset_class(dataset_path)
     video_names = _resolve_video_names(frames_dataset, selected_video_names)

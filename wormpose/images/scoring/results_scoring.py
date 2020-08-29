@@ -38,7 +38,9 @@ class ResultsScoring(object):
         self.data_reading_queue = None
 
     def __call__(
-        self, results: BaseResults, scoring_data_manager: BaseScoringDataManager,
+        self,
+        results: BaseResults,
+        scoring_data_manager: BaseScoringDataManager,
     ):
 
         manager = Manager()
@@ -62,7 +64,8 @@ class ResultsScoring(object):
             w.start()
 
         self._produce_data_chunks(
-            results_theta=results.theta, scoring_data_manager=scoring_data_manager,
+            results_theta=results.theta,
+            scoring_data_manager=scoring_data_manager,
         )
 
         for w in workers:
@@ -96,7 +99,12 @@ class ResultsScoring(object):
 
             for frame_index, thetas in enumerate(results_theta):
 
-                (template_frame, template_skeleton, template_measurements, frame,) = scoring_data[frame_index]
+                (
+                    template_frame,
+                    template_skeleton,
+                    template_measurements,
+                    frame,
+                ) = scoring_data[frame_index]
 
                 chunk_template_frames.append(template_frame)
                 chunk_data.append((thetas, template_skeleton, template_measurements))
@@ -126,7 +134,11 @@ class ResultsScoring(object):
 
 
 def _compare_pred_real(
-    frame_preprocessing: BaseFramePreprocessing, data_reading_queue, results_queue, image_shape, temp_dir: str,
+    frame_preprocessing: BaseFramePreprocessing,
+    data_reading_queue,
+    results_queue,
+    image_shape,
+    temp_dir: str,
 ):
     centerline_accuracy = CenterlineAccuracyCheck(frame_preprocessing=frame_preprocessing, image_shape=image_shape)
     while True:
@@ -155,7 +167,12 @@ def _compare_pred_real(
                 all_scores = np.empty((len(chunk_data), thetas.shape[0]), dtype=float)
             if all_skel is None:
                 all_skel = np.empty(
-                    (len(chunk_data), thetas.shape[0],) + template_skeleton.shape, dtype=template_skeleton.dtype
+                    (
+                        len(chunk_data),
+                        thetas.shape[0],
+                    )
+                    + template_skeleton.shape,
+                    dtype=template_skeleton.dtype,
                 )
 
             for flip_index, cur_theta in enumerate(thetas):

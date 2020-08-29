@@ -36,7 +36,12 @@ class Features(object):
     def _set_measurements(self, raw_features: dict):
         worm_length = _calculate_worm_length(self.skeletons)
         self.measurements = np.stack(
-            [worm_length, raw_features["head_width"], raw_features["midbody_width"], raw_features["tail_width"],],
+            [
+                worm_length,
+                raw_features["head_width"],
+                raw_features["midbody_width"],
+                raw_features["tail_width"],
+            ],
             axis=1,
         )
         self.measurements.dtype = {
@@ -84,7 +89,7 @@ def _validate_features(raw_features: dict):
 def calculate_max_average_worm_length(features: FeaturesDict) -> float:
     """
     Calculates the average worm length from each video, and returns the maximum.
-    
+
     :param features: A dictionary of Features
     :return: Biggest average worm length from all videos
     """

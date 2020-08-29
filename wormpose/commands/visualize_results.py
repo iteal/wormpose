@@ -30,7 +30,11 @@ logger.setLevel(logging.DEBUG)
 
 class _Visualizer(object):
     def __init__(
-        self, dataset: Dataset, results_dir: str, temp_dir: str, draw_original: bool,
+        self,
+        dataset: Dataset,
+        results_dir: str,
+        temp_dir: str,
+        draw_original: bool,
     ):
         self.dataset = dataset
         self.results_dir = results_dir
@@ -66,13 +70,19 @@ class _Visualizer(object):
                 if self.draw_original:
                     # draw original skeleton in white
                     draw_skeleton(
-                        cur_raw_frame, features.skeletons[cur_frame_index], original_color, original_color,
+                        cur_raw_frame,
+                        features.skeletons[cur_frame_index],
+                        original_color,
+                        original_color,
                     )
                 # draw skeleton from network predictions in green
                 draw_skeleton(cur_raw_frame, skel, predicted_color, predicted_color)
 
                 cv2.imwrite(
-                    os.path.join(images_temp_dir, image_filename_format.format(cur_time, cur_frame_index, score),),
+                    os.path.join(
+                        images_temp_dir,
+                        image_filename_format.format(cur_time, cur_frame_index, score),
+                    ),
                     cur_raw_frame,
                 )
 
@@ -125,7 +135,10 @@ def visualize(dataset_path: str, **kwargs):
     dataset = load_dataset(config.dataset_loader, dataset_path, selected_video_names=args.video_names)
 
     visualizer = _Visualizer(
-        dataset=dataset, draw_original=args.draw_original, temp_dir=args.temp_dir, results_dir=results_dir,
+        dataset=dataset,
+        draw_original=args.draw_original,
+        temp_dir=args.temp_dir,
+        results_dir=results_dir,
     )
 
     for video_name in dataset.video_names:

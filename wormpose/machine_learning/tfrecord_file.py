@@ -12,7 +12,11 @@ from wormpose.machine_learning.generic_file_writer import GenericFileWriter
 
 
 def get_tfrecord_dataset(
-    filenames, image_shape: Tuple[int, int], batch_size: int, theta_dims: int, is_train: bool,
+    filenames,
+    image_shape: Tuple[int, int],
+    batch_size: int,
+    theta_dims: int,
+    is_train: bool,
 ):
     dataset = tf.data.TFRecordDataset(filenames, compression_type="GZIP")
 
@@ -21,7 +25,11 @@ def get_tfrecord_dataset(
         dataset = dataset.repeat()
 
     dataset = dataset.map(
-        partial(parse_example_normalize_image, theta_dims=theta_dims, image_shape=image_shape,),
+        partial(
+            parse_example_normalize_image,
+            theta_dims=theta_dims,
+            image_shape=image_shape,
+        ),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     dataset = dataset.batch(batch_size)

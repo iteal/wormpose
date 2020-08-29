@@ -22,7 +22,10 @@ class TargetSkeletonCalculator(object):
     def calculate(self, theta, worm_length, out):
 
         calculate_skeleton(
-            theta, worm_length, canvas_width_height=self.output_image_shape, out=self.non_interpolated_skeleton,
+            theta,
+            worm_length,
+            canvas_width_height=self.output_image_shape,
+            out=self.non_interpolated_skeleton,
         )
 
         if self.need_interpolation:

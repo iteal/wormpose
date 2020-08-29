@@ -132,7 +132,10 @@ class _SplineInterpolation(object):
 
 
 def _smooth_tseries(
-    tseries: np.ndarray, smoothing_window_length: int, poly_order: int, segments_boundaries: Sequence,
+    tseries: np.ndarray,
+    smoothing_window_length: int,
+    poly_order: int,
+    segments_boundaries: Sequence,
 ) -> np.ndarray:
     if smoothing_window_length % 2 == 0:
         smoothing_window_length += 1  # need a odd number for smoothing_window_length
@@ -143,7 +146,10 @@ def _smooth_tseries(
         if tf - t0 < smoothing_window_length or tf - t0 < poly_order:
             continue
         new_tseries[t0:tf] = savgol_filter(
-            tseries[t0:tf], axis=0, window_length=smoothing_window_length, polyorder=poly_order,
+            tseries[t0:tf],
+            axis=0,
+            window_length=smoothing_window_length,
+            polyorder=poly_order,
         )
 
     return new_tseries
@@ -191,7 +197,9 @@ def _calculate_skeleton(theta: np.ndarray, args, dataset: Dataset, video_name: s
     )(
         results=results,
         scoring_data_manager=ScoringDataManager(
-            video_name=video_name, frames_dataset=dataset.frames_dataset, features=features,
+            video_name=video_name,
+            frames_dataset=dataset.frames_dataset,
+            features=features,
         ),
     )
     resample_results(results, features.timestamp)
@@ -281,7 +289,9 @@ def post_process(dataset_path: str, **kwargs):
                 continue
 
             segments_boundaries = _get_valid_segments(
-                is_valid_series=~missing_values, max_gap_size=args.max_gap_size, min_segment_size=args.min_segment_size,
+                is_valid_series=~missing_values,
+                max_gap_size=args.max_gap_size,
+                min_segment_size=args.min_segment_size,
             )
             # interpolate and smooth in angles space
             thetas_interp = spline_interpolation.interpolate_tseries(
@@ -289,7 +299,12 @@ def post_process(dataset_path: str, **kwargs):
             )
             results_interp = _calculate_skeleton(thetas_interp, args, dataset, video_name)
 
-            thetas_smooth = _smooth_tseries(thetas_interp, args.smoothing_window, args.poly_order, segments_boundaries,)
+            thetas_smooth = _smooth_tseries(
+                thetas_interp,
+                args.smoothing_window,
+                args.poly_order,
+                segments_boundaries,
+            )
             results_smooth = _calculate_skeleton(thetas_smooth, args, dataset, video_name)
 
             flipped = False
@@ -336,7 +351,8 @@ def main():
 
     parser.add_argument("dataset_path", type=str)
     parser.add_argument(
-        "--eigenworms_matrix_path", help="Path to optional eigenworms matrix to also save results in eigenworm modes",
+        "--eigenworms_matrix_path",
+        help="Path to optional eigenworms matrix to also save results in eigenworm modes",
     )
     parser.add_argument("--work_dir", type=str, help="Root folder for all experiments")
     add_config_argument(parser)

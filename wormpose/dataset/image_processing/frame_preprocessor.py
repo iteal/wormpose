@@ -36,7 +36,8 @@ def run(frame_preprocessing: BaseFramePreprocessing, frame: np.ndarray) -> Tuple
         worm_roi = np.s_[0 : frame_copy.shape[0], 0 : frame_copy.shape[1]]
     else:
         worm_roi = np.s_[
-            np.min(where_worm[0]) : np.max(where_worm[0]), np.min(where_worm[1]) : np.max(where_worm[1]),
+            np.min(where_worm[0]) : np.max(where_worm[0]),
+            np.min(where_worm[1]) : np.max(where_worm[1]),
         ]
 
     return frame_copy, background_color, worm_roi

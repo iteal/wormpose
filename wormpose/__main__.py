@@ -26,7 +26,10 @@ def main():
 
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
-        "command", type=str, choices=entry_points.keys(), help="Choose which command to run",
+        "command",
+        type=str,
+        choices=entry_points.keys(),
+        help="Choose which command to run",
     )
     parser.add_argument("-v", "--version", action="version", version=__version__)
     parser.parse_known_args()

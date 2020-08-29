@@ -54,7 +54,10 @@ class SyntheticDataset(object):
     """
 
     def __init__(
-        self, frame_preprocessing: BaseFramePreprocessing, enable_random_augmentations: bool, output_image_shape,
+        self,
+        frame_preprocessing: BaseFramePreprocessing,
+        enable_random_augmentations: bool,
+        output_image_shape,
     ):
         """
 
@@ -106,7 +109,10 @@ class SyntheticDataset(object):
             frame, bg_mean_color, worm_roi = frame_preprocessor.run(self.frame_preprocessing, template_frame)
             self._frames_infos_cache[frame_id] = (worm_roi, bg_mean_color)
 
-        template_skeletons_recentered = template_skeleton - (worm_roi[1].start, worm_roi[0].start,)
+        template_skeletons_recentered = template_skeleton - (
+            worm_roi[1].start,
+            worm_roi[0].start,
+        )
         return template_frame[worm_roi], bg_mean_color, template_skeletons_recentered
 
     def _get_synth_measurements(self, worm_measurements):
@@ -209,7 +215,9 @@ class SyntheticDataset(object):
 
         # apply the worm outline mask to hide some unwanted pixels from the patch drawing
         self._worm_outline_mask.apply(
-            worm_thickness=target_worm_thickness / 2, output_image=self._out_image, target_skel=target_skel,
+            worm_thickness=target_worm_thickness / 2,
+            output_image=self._out_image,
+            target_skel=target_skel,
         )
 
         # all zero pixels become background color #FIXME this doesn't work if the worm image has zero values

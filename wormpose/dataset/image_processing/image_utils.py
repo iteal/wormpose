@@ -42,7 +42,10 @@ class OtsuThreshold(object):
         blurred_frame = cv2.GaussianBlur(frame, self.blur_kernel, 0)
         blurred_frame[frame == 0] = 0
         background_threshold, _ = cv2.threshold(
-            blurred_frame[blurred_frame > 0], 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+            blurred_frame[blurred_frame > 0],
+            0,
+            255,
+            cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
         )
         return background_threshold
 

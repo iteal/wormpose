@@ -104,7 +104,8 @@ def generate(dataset_loader: str, dataset_path: str, **kwargs):
         random_seed=args.random_seed,
     )
     gen = synthetic_data_generator.generate(
-        num_samples=args.num_train_samples, file_pattern=os.path.join(args.temp_dir, SYNTH_TRAIN_DATASET_NAMES),
+        num_samples=args.num_train_samples,
+        file_pattern=os.path.join(args.temp_dir, SYNTH_TRAIN_DATASET_NAMES),
     )
     for progress in gen:
         yield progress
