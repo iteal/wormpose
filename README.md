@@ -1,4 +1,4 @@
-![](https://i.imgur.com/nvCDFK0.png)
+![](https://i.imgur.com/hcOUEif.png)
 
 [![PyPI status](https://img.shields.io/pypi/status/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
 [![PyPI version](https://badge.fury.io/py/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
