@@ -94,6 +94,10 @@ class ResizedFrames(object):
     def __len__(self):
         return len(self.frames)
 
+    def __iter__(self):
+        for orig in self.frames:
+            yield self._resize(orig)
+
 
 class ResizedFramesReader(object):
     def __init__(self, frames_reader, resize_factor: float):
