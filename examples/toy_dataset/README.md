@@ -1,7 +1,7 @@
 ## Load custom data
 
 ### Toy dataset example
-An example of implementing a custom dataset loader is available [here](https://github.com/iteal/wormpose/tree/master/examples/toy_dataset) (using toy data).
+An example of implementing a custom dataset loader is available [here](https://github.com/iteal/wormpose/tree/main/examples/toy_dataset) (using toy data).
 
 First install the WormPose package.
 ```bash
@@ -47,7 +47,7 @@ class FramePreprocessing(BaseFramePreprocessing):
     raise NotImplementedError("Here, implement interface BaseFramePreprocessing")
 ```
 
-The API documentation can be found [here](https://github.com/iteal/wormpose/blob/master/wormpose/dataset/base_dataset.py). 
+The API documentation can be found [here](https://github.com/iteal/wormpose/blob/main/wormpose/dataset/base_dataset.py). 
 
 Create a file `setup.py` containing the entry point `worm_dataset_loaders` refering to your python module, with its loader name, such as below:
 ```python
@@ -67,4 +67,4 @@ Now you can use the dataset loader named "cool_worms" :
 wormpose COMMAND cool_worms "path/to/cool_worms_dataset000XX"
 ```
 
-Use the notebook [check_dataset](https://github.com/iteal/wormpose/blob/master/examples/check_dataset.ipynb) to validate your custom dataset loader. You can view if the frames load correctly, and if the features are accurate.
+Use the notebook [check_dataset](https://github.com/iteal/wormpose/blob/main/examples/check_dataset.ipynb) to validate your custom dataset loader. You can view if the frames load correctly, and if the features are accurate.

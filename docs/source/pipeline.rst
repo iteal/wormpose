@@ -18,7 +18,7 @@ check the :ref:`tierpsy` guide to setup a Tierpsy dataset.
 There is also a simple dataset used in the tutorials, which is a folder of images
 associated with a HDF5 file for the features. You can also assemble your
 own dataset composed of worm videos associated with their features
-(`instructions <https://github.com/iteal/wormpose/tree/master/examples/toy_dataset>`__).
+(`instructions <https://github.com/iteal/wormpose/tree/main/examples/toy_dataset>`__).
 
 2 - Generate training data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

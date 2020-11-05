@@ -23,7 +23,7 @@ Each subdirectory contains one video, the file tree should look like below (note
     |   |   +-- video_name1_features.hdf5 or video_name1_featuresN.hdf5
     |   ...
 
-For using `Open Worm Movement Database <http://movement.openworm.org/>`__ videos from the `Zenodo <https://zenodo.org/>`__ website, we provide a `download script <https://github.com/iteal/wormpose_data/tree/master/datasets/tierpsy>`__ that will create the file tree described above.
+For using `Open Worm Movement Database <http://movement.openworm.org/>`__ videos from the `Zenodo <https://zenodo.org/>`__ website, we provide a `download script <https://github.com/iteal/wormpose_data/tree/main/datasets/tierpsy>`__ that will create the file tree described above.
 
 **Limitations**
 
