@@ -22,7 +22,7 @@ The WormPose package estimates the challenging poses of C. elegans in videos inc
 We train a convolutional neural network with synthetic worm images so that there is no need for human annotated labels. 
 
 ## Get started quickly
-[Try the tutorial notebook](https://github.com/iteal/wormpose/blob/master/examples/tutorial_sample_data.ipynb)   <a href="https://colab.research.google.com/github/iteal/wormpose/blob/master/examples/tutorial_sample_data.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+[Try the tutorial notebook](https://github.com/iteal/wormpose/blob/main/examples/tutorial_sample_data.ipynb)   <a href="https://colab.research.google.com/github/iteal/wormpose/blob/master/examples/tutorial_sample_data.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 This notebook goes over the whole WormPose pipeline with some sample data and an already trained model. You can run it in Google Colab.
 
