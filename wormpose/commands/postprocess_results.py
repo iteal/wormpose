@@ -370,7 +370,7 @@ def main():
     )
     parser.add_argument(
         "--std_fraction",
-        type=int,
+        type=float,
         help="The higher the guessed noise to signal ratio is, the smoother the interpolation will be",
     )
     parser.add_argument("--smoothing_window", type=int, help="smoothing window in frames")
