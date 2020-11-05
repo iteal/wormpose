@@ -352,25 +352,26 @@ def main():
     parser.add_argument("dataset_path", type=str)
     parser.add_argument(
         "--eigenworms_matrix_path",
+        type=str,
         help="Path to optional eigenworms matrix to also save results in eigenworm modes",
     )
     parser.add_argument("--work_dir", type=str, help="Root folder for all experiments")
     add_config_argument(parser)
     parser.add_argument(
         "--max_gap_size",
-        type=float,
+        type=int,
         help="Interpolate over missing values (gaps), as long"
         "as the consecutive length of the missing values is less than max_gap_size (frames)",
     )
     parser.add_argument(
         "--min_segment_size",
-        type=float,
+        type=int,
         help="Only segments of valid values of length greater than min_segment_size (frames)"
         "will be interpolated and smoothed",
     )
     parser.add_argument(
         "--std_fraction",
-        type=int,
+        type=float,
         help="The higher the guessed noise to signal ratio is, the smoother the interpolation will be",
     )
     parser.add_argument("--smoothing_window", type=int, help="smoothing window in frames")
