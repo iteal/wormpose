@@ -3,7 +3,6 @@ language: python
 branches:
   only:
     - main
-    - master
     - develop
 
 python:
