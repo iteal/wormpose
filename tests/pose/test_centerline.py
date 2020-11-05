@@ -123,7 +123,11 @@ def test_calculate_skeleton():
     dims = 10
 
     input_outputs = [
-        (np.full(dims, np.nan), np.nan, np.full((dims, 2), np.nan),),
+        (
+            np.full(dims, np.nan),
+            np.nan,
+            np.full((dims, 2), np.nan),
+        ),
         (
             np.zeros(dims, dtype=float),
             25,

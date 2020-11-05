@@ -44,7 +44,9 @@ jobs:
       python: 3.6
       install:
         - pip install -r requirements_dev.txt
-      script: black --check wormpose
+      script:
+        - black --check wormpose
+        - black --check tests
     - stage: docs
       python: 3.6
       addons:

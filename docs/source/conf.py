@@ -58,7 +58,7 @@ html_theme_options = {"github_user": "iteal", "github_repo": "wormpose", "github
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-#html_static_path = ["_static"]
+# html_static_path = ["_static"]
 
 # Autosumary
 autoclass_content = "both"  # include both class docstring and __init__
