@@ -213,13 +213,13 @@ def _parse_arguments(dataset_path: str, kwargs: dict):
     if kwargs.get("max_gap_size") is None:
         kwargs["max_gap_size"] = 3
     if kwargs.get("min_segment_size") is None:
-        kwargs["min_segment_size"] = 30
+        kwargs["min_segment_size"] = 11
     if kwargs.get("smoothing_window") is None:
         kwargs["smoothing_window"] = 7
     if kwargs.get("poly_order") is None:
         kwargs["poly_order"] = 3
     if kwargs.get("std_fraction") is None:
-        kwargs["std_fraction"] = 0.01
+        kwargs["std_fraction"] = 0.001
     if kwargs.get("eigenworms_matrix_path") is None:
         kwargs["eigenworms_matrix_path"] = None
     if kwargs.get("num_process") is None:
