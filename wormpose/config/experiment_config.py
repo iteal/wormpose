@@ -34,6 +34,7 @@ class ExperimentConfig(object):
         theta_dimensions: int = None,
         resize_factor: float = None,
         video_names: List[str] = None,
+        worm_is_lighter: bool = None,
     ):
         self.num_train_samples = num_train_samples
         self.num_eval_samples = num_eval_samples
@@ -42,6 +43,7 @@ class ExperimentConfig(object):
         self.theta_dimensions = theta_dimensions
         self.resize_factor = resize_factor
         self.video_names = video_names
+        self.worm_is_lighter = worm_is_lighter
 
 
 def save_config(experiment_config: ExperimentConfig, config_filepath: str):

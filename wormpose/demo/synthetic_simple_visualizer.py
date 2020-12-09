@@ -8,6 +8,7 @@ import random
 from typing import Optional, Generator
 import numpy as np
 
+from wormpose.dataset.image_processing.options import add_image_processing_arguments
 from wormpose.dataset.loader import load_dataset
 from wormpose.dataset.loaders.resizer import add_resizing_arguments, ResizeOptions
 from wormpose.images.synthetic import SyntheticDataset
@@ -28,7 +29,7 @@ class SyntheticSimpleVisualizer(object):
         **kwargs
     ):
         resize_options = ResizeOptions(**kwargs)
-        dataset = load_dataset(dataset_loader, dataset_path, resize_options=resize_options)
+        dataset = load_dataset(dataset_loader, dataset_path, resize_options=resize_options, **kwargs)
 
         if postures_generator is None:
             postures_generator = PosturesModel().generate()
@@ -81,6 +82,7 @@ def main():
     parser.add_argument("--video_name", type=str)
     parser.add_argument("--random_seed", type=int, help="Optional random seed for deterministic results")
     add_resizing_arguments(parser)
+    add_image_processing_arguments(parser)
 
     args = parser.parse_args()
 

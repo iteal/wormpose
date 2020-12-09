@@ -55,6 +55,7 @@ def segment_foreground(
     foreground_close_struct_element,
     foreground_dilate_struct_element,
     threshold_fn: Callable[[np.ndarray], int],
+    is_foreground_lighter_than_background: bool,
 ):
     """
     Processes a frame to isolate the object of interest (worm) from the background
@@ -62,7 +63,9 @@ def segment_foreground(
     :param frame: image to process
     :param foreground_close_struct_element: morphological element to close holes in the foreground mask
     :param foreground_dilate_struct_element: morphological element to expand the foreground mask
-    :param threshold_fn: function that will return the threshold to separate forefround from background in a frame
+    :param threshold_fn: function that will return the threshold to separate foreground from background in a frame
+    :param is_foreground_lighter_than_background: set to True if the foreground object of interest is lighter
+     (pixel values are on average higher) than the background
     :return: segmentation mask with values of 1 for the worm object and 0 for the background,
         and average value of the background pixels
     """
@@ -73,10 +76,14 @@ def segment_foreground(
     # use the threshold to deduce background and foreground masks, fill in holes
     foreground_mask = (frame > 0).astype(np.uint8) * (frame < background_threshold).astype(np.uint8)
     foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, foreground_close_struct_element)
-    background_mask = ((frame > 0).astype(np.uint8) - foreground_mask) > 0
+    background_mask = (((frame > 0).astype(np.uint8) - foreground_mask) > 0).astype(np.uint8)
+
+    # invert foreground and background masks if the foreground is lighter than the background
+    if is_foreground_lighter_than_background:
+        foreground_mask, background_mask = background_mask, foreground_mask
 
     # calculate the average background color
-    background_values = frame[background_mask]
+    background_values = frame[background_mask.astype(bool)]
     background_color = int(np.mean(background_values)) if len(background_values) > 0 else 0
     background_color = frame.dtype.type(background_color)
 
