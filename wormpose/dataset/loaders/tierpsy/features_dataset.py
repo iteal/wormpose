@@ -13,6 +13,20 @@ from xml.dom import minidom
 from wormpose.dataset.base_dataset import BaseFeaturesDataset
 
 
+def get_frames_timestamp(f):
+    frames_timestamp = f["timestamp"]["raw"][:]
+
+    # check if the timestamp is valid (not all NaN)
+    if np.all(np.isnan(frames_timestamp)):
+        raise ValueError(
+            "Timestamp is invalid (field timestamp/raw), "
+            "Please check that you selected the option 'extract_timestamp'"
+            " in Tierpsy, or refer to the Tierpsy documentation."
+        )
+
+    return frames_timestamp
+
+
 def get_frame_rate(f):
     mask_attrs = f["mask"].attrs
     if "fps" in mask_attrs:
@@ -118,7 +132,7 @@ def _read_features(root_dir, name):
     h5featurefile = get_features_filename(root_dir, name)
 
     with h5py.File(h5file, "r") as f:
-        frames_timestamp = f["timestamp"]["raw"][:]
+        frames_timestamp = get_frames_timestamp(f)
         frame_rate = get_frame_rate(f)
         ventral_side = get_ventral_side(f)
         stage_position_pix = get_stage_position(f)
