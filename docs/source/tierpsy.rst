@@ -28,6 +28,7 @@ For using `Open Worm Movement Database <http://movement.openworm.org/>`__ videos
 **Limitations**
 
 Please use the option "extract timestamp" in Tierpsy so that the field "timestamp/raw" is set in the hdf5 file. The configuration without the timestamp is not currently supported in WormPose.
+
 For Tierpsy files with several worm indexes per file, WormPose will only load one worm, the one with the smallest index.
 
 **Troubleshooting**

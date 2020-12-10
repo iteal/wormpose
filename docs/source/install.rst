@@ -47,5 +47,7 @@ variable.
 **Limitations**
 
 WormPose doesn't support at the moment multiple worms in one image.
+
 Only grayscale images (1 channel) are supported.
+
 The resolution of the worm should not be too low, we have tested it successfully with images where the worm length was 90 pixels, but having a smaller resolution will degrade the accuracy rapidly.
