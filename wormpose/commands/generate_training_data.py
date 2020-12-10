@@ -23,6 +23,10 @@ from wormpose.config.default_paths import (
     CONFIG_FILENAME,
 )
 from wormpose.config.experiment_config import save_config, ExperimentConfig
+from wormpose.dataset.image_processing.options import (
+    add_image_processing_arguments,
+    WORM_IS_LIGHTER,
+)
 from wormpose.dataset.loader import get_dataset_name
 from wormpose.dataset.loader import load_dataset
 from wormpose.dataset.loaders.resizer import add_resizing_arguments, ResizeOptions
@@ -53,6 +57,8 @@ def _parse_arguments(kwargs: dict):
         kwargs["video_names"] = None
     if kwargs.get("random_seed") is None:
         kwargs["random_seed"] = None
+    if kwargs.get(WORM_IS_LIGHTER) is None:
+        kwargs[WORM_IS_LIGHTER] = False
     kwargs["temp_dir"] = tempfile.mkdtemp(dir=kwargs["temp_dir"])
     kwargs["resize_options"] = ResizeOptions(**kwargs)
 
@@ -89,8 +95,8 @@ def generate(dataset_loader: str, dataset_path: str, **kwargs):
     dataset = load_dataset(
         dataset_loader=dataset_loader,
         dataset_path=dataset_path,
-        resize_options=args.resize_options,
         selected_video_names=args.video_names,
+        **vars(args),
     )
 
     start = time.time()
@@ -129,6 +135,7 @@ def generate(dataset_loader: str, dataset_path: str, **kwargs):
             num_eval_samples=num_eval_samples,
             resize_factor=args.resize_options.resize_factor,
             video_names=dataset.video_names,
+            worm_is_lighter=getattr(args, WORM_IS_LIGHTER),
         ),
         os.path.join(experiment_dir, CONFIG_FILENAME),
     )
@@ -157,6 +164,7 @@ def main():
     parser.add_argument("--num_process", type=int, help="How many worker processes")
     parser.add_argument("--random_seed", type=int, help="Optional random seed for deterministic results")
     add_resizing_arguments(parser)
+    add_image_processing_arguments(parser)
     args = parser.parse_args()
 
     last_progress = None

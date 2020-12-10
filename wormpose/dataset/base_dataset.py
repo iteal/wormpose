@@ -13,6 +13,9 @@ class BaseFramePreprocessing(ABC):
     This object must be pickable (no inner functions for example)
     """
 
+    def __init__(self, *args, **kwargs):
+        pass
+
     @abstractmethod
     def process(self, frame: np.ndarray) -> Tuple[np.ndarray, int]:
         """

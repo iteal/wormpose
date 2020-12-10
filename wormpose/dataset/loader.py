@@ -14,6 +14,7 @@ from wormpose.dataset.base_dataset import (
     BaseResultsExporter,
 )
 from wormpose.dataset.features import Features, calculate_crop_window_size, FeaturesDict
+from wormpose.dataset.image_processing.options import WORM_IS_LIGHTER
 from wormpose.dataset.loaders.resizer import (
     frames_dataset_resizer,
     features_dataset_resizer,
@@ -68,6 +69,7 @@ def load_dataset(
     dataset_path: str,
     selected_video_names: Optional[List[str]] = None,
     resize_options: ResizeOptions = None,
+    **kwargs,
 ) -> Dataset:
     for entry_point in pkg_resources.iter_entry_points("worm_dataset_loaders"):
         if entry_point.name == dataset_loader:
@@ -84,7 +86,8 @@ def load_dataset(
                 selected_video_names,
             )
 
-            frame_preprocessing = frame_preprocessing_class()
+            is_foreground_lighter_than_background = kwargs.get(WORM_IS_LIGHTER, False)
+            frame_preprocessing = frame_preprocessing_class(is_foreground_lighter_than_background)
             image_shape = calculate_crop_window_size(features_dataset)
 
             if resize_options is not None:

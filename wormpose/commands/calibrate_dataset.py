@@ -16,6 +16,7 @@ import numpy as np
 from wormpose.commands import _log_parameters
 from wormpose.config import default_paths
 from wormpose.dataset import Dataset
+from wormpose.dataset.image_processing.options import add_image_processing_arguments
 from wormpose.dataset.loader import get_dataset_name
 from wormpose.dataset.loader import load_dataset
 from wormpose.images.scoring.centerline_accuracy_check import CenterlineAccuracyCheck
@@ -155,7 +156,10 @@ def calibrate(dataset_loader: str, dataset_path: str, **kwargs):
     os.makedirs(calibration_results_dir, exist_ok=True)
 
     dataset = load_dataset(
-        dataset_loader, dataset_path, resize_options=args.resize_options, selected_video_names=args.video_names
+        dataset_loader,
+        dataset_path,
+        selected_video_names=args.video_names,
+        **vars(args),
     )
 
     calibrator = _Calibrator(
@@ -178,10 +182,8 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    # inputs
     parser.add_argument("dataset_loader", type=str)
     parser.add_argument("dataset_path", type=str)
-    add_resizing_arguments(parser)
     parser.add_argument(
         "--video_names",
         type=str,
@@ -199,6 +201,8 @@ def main():
         "--save_images", default=False, action="store_true", help="Also save the images used for the calibration"
     )
     parser.add_argument("--random_seed", type=int, help="Optional random seed for deterministic results")
+    add_resizing_arguments(parser)
+    add_image_processing_arguments(parser)
 
     args = parser.parse_args()
 

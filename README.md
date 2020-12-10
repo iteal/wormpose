@@ -2,7 +2,7 @@
 
 [![PyPI status](https://img.shields.io/pypi/status/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
 [![PyPI version](https://badge.fury.io/py/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
-[![Build Status](https://travis-ci.org/iteal/wormpose.svg?branch=main)](https://travis-ci.org/iteal/wormpose)
+[![Build Status](https://travis-ci.com/iteal/wormpose.svg?branch=main)](https://travis-ci.com/iteal/wormpose)
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
 [![DOI](https://zenodo.org/badge/246706178.svg)](https://zenodo.org/badge/latestdoi/246706178)
 [![Maintainability](https://img.shields.io/codeclimate/maintainability/iteal/wormpose)](https://codeclimate.com/github/iteal/wormpose/maintainability)

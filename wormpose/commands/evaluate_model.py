@@ -23,6 +23,7 @@ from wormpose.config import default_paths
 from wormpose.config.default_paths import CONFIG_FILENAME
 from wormpose.config.experiment_config import load_config, add_config_argument
 from wormpose.dataset import Dataset
+from wormpose.dataset.image_processing.options import WORM_IS_LIGHTER
 from wormpose.dataset.loader import load_dataset, get_dataset_name
 from wormpose.dataset.loaders.resizer import ResizeOptions
 from wormpose.images.scoring import ResultsScoring, BaseScoringDataManager
@@ -172,6 +173,7 @@ def evaluate(dataset_path: str, **kwargs):
         dataset_path=dataset_path,
         selected_video_names=args.video_names,
         resize_options=ResizeOptions(resize_factor=config.resize_factor),
+        **{WORM_IS_LIGHTER: config.worm_is_lighter},
     )
 
     pkl_filenames = _generate_synthetic_data(

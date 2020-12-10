@@ -3,7 +3,7 @@
 """
 Visualizer for the real processed images
 """
-
+from wormpose.dataset.image_processing.options import add_image_processing_arguments
 from wormpose.dataset.loader import load_dataset
 from wormpose.dataset.loaders.resizer import add_resizing_arguments, ResizeOptions
 from wormpose.images.real_dataset import RealDataset
@@ -16,7 +16,7 @@ class RealSimpleVisualizer(object):
 
     def __init__(self, dataset_loader: str, dataset_path: str, video_name=None, **kwargs):
         resize_options = ResizeOptions(**kwargs)
-        dataset = load_dataset(dataset_loader, dataset_path, resize_options=resize_options)
+        dataset = load_dataset(dataset_loader, dataset_path, resize_options=resize_options, **kwargs)
 
         self.video_name = video_name if video_name is not None else dataset.video_names[0]
         self.real_dataset = RealDataset(
@@ -45,6 +45,7 @@ def main():
         help="Optional video name. If not set, only visualize one video.",
     )
     add_resizing_arguments(parser)
+    add_image_processing_arguments(parser)
     args = parser.parse_args()
 
     real_visualizer = RealSimpleVisualizer(**vars(args))
