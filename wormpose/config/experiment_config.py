@@ -32,9 +32,9 @@ class ExperimentConfig(object):
         image_shape: Tuple[int, int] = None,
         dataset_loader: str = None,
         theta_dimensions: int = None,
-        resize_factor: float = None,
+        resize_factor: float = 1.0,
         video_names: List[str] = None,
-        worm_is_lighter: bool = None,
+        worm_is_lighter: bool = False,
     ):
         self.num_train_samples = num_train_samples
         self.num_eval_samples = num_eval_samples
