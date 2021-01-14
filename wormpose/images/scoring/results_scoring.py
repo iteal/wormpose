@@ -84,9 +84,9 @@ class ResultsScoring(object):
 
             # handle case for results containing one centerline
             if len(results_scores.shape) == 1:
-                results_scores = results_scores[np.newaxis]
+                results_scores = results_scores[:, np.newaxis]
             if len(results_skel.shape) == 3:
-                results_skel = results_skel[np.newaxis]
+                results_skel = results_skel[:, np.newaxis]
 
             matching_scores.append(results_scores)
             matching_skeletons.append(results_skel)
