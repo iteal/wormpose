@@ -1,0 +1,5 @@
+﻿wormpose.machine_learning.model
+===============================
+
+.. automodule:: wormpose.machine_learning.model
+    :members:

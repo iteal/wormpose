@@ -1,0 +1,5 @@
+﻿wormpose.pose.headtail_resolution
+=================================
+
+.. automodule:: wormpose.pose.headtail_resolution
+    :members:

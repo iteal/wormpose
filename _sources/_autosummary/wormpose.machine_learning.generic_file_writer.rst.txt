@@ -1,0 +1,5 @@
+﻿wormpose.machine_learning.generic_file_writer
+=============================================
+
+.. automodule:: wormpose.machine_learning.generic_file_writer
+    :members:

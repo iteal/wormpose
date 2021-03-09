@@ -1,0 +1,5 @@
+﻿wormpose.pose.centerline
+========================
+
+.. automodule:: wormpose.pose.centerline
+    :members:

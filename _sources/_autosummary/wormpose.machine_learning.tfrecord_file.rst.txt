@@ -1,0 +1,5 @@
+﻿wormpose.machine_learning.tfrecord_file
+=======================================
+
+.. automodule:: wormpose.machine_learning.tfrecord_file
+    :members:

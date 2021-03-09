@@ -1,0 +1,5 @@
+﻿wormpose.version
+================
+
+.. automodule:: wormpose.version
+    :members:

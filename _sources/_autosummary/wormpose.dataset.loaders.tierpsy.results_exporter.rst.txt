@@ -1,0 +1,5 @@
+﻿wormpose.dataset.loaders.tierpsy.results_exporter
+=================================================
+
+.. automodule:: wormpose.dataset.loaders.tierpsy.results_exporter
+    :members:

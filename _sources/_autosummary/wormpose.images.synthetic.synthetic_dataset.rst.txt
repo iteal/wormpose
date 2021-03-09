@@ -1,0 +1,5 @@
+﻿wormpose.images.synthetic.synthetic_dataset
+===========================================
+
+.. automodule:: wormpose.images.synthetic.synthetic_dataset
+    :members:

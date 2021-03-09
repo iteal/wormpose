@@ -1,0 +1,5 @@
+﻿wormpose.commands.generate_training_data
+========================================
+
+.. automodule:: wormpose.commands.generate_training_data
+    :members:

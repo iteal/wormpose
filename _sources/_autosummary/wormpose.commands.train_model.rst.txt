@@ -1,0 +1,5 @@
+﻿wormpose.commands.train_model
+=============================
+
+.. automodule:: wormpose.commands.train_model
+    :members:

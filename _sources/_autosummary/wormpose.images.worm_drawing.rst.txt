@@ -1,0 +1,5 @@
+﻿wormpose.images.worm_drawing
+============================
+
+.. automodule:: wormpose.images.worm_drawing
+    :members:

@@ -1,0 +1,61 @@
+.. _api:
+
+Documentation of WormPose.
+==========================
+
+.. toctree::
+   :caption: Documentation
+
+.. autosummary::
+   :toctree: _autosummary
+
+   wormpose.commands.calibrate_dataset
+   wormpose.commands.evaluate_model
+   wormpose.commands.export_results
+   wormpose.commands.generate_training_data
+   wormpose.commands.postprocess_results
+   wormpose.commands.predict_dataset
+   wormpose.commands.train_model
+   wormpose.commands.utils.results_saver
+   wormpose.commands.utils.time_sampling
+   wormpose.commands.visualize_results
+   wormpose.config.default_paths
+   wormpose.config.experiment_config
+   wormpose.dataset.base_dataset
+   wormpose.dataset.features
+   wormpose.dataset.image_processing.frame_preprocessor
+   wormpose.dataset.image_processing.image_utils
+   wormpose.dataset.image_processing.options
+   wormpose.dataset.image_processing.simple_frame_preprocessing
+   wormpose.dataset.loader
+   wormpose.dataset.loaders.hdf5features
+   wormpose.dataset.loaders.images_folder
+   wormpose.dataset.loaders.resizer
+   wormpose.dataset.loaders.sample_data
+   wormpose.dataset.loaders.tierpsy.features_dataset
+   wormpose.dataset.loaders.tierpsy.frames_dataset
+   wormpose.dataset.loaders.tierpsy.results_exporter
+   wormpose.demo.real_simple_visualizer
+   wormpose.demo.synthetic_simple_visualizer
+   wormpose.images.real_dataset
+   wormpose.images.scoring.centerline_accuracy_check
+   wormpose.images.scoring.image_scoring
+   wormpose.images.scoring.results_scoring
+   wormpose.images.scoring.scoring_data_manager
+   wormpose.images.synthetic.synthetic_dataset
+   wormpose.images.worm_drawing
+   wormpose.machine_learning.best_models_saver
+   wormpose.machine_learning.eval_data_generator
+   wormpose.machine_learning.generic_file_writer
+   wormpose.machine_learning.loss
+   wormpose.machine_learning.model
+   wormpose.machine_learning.predict_data_generator
+   wormpose.machine_learning.synthetic_data_generator
+   wormpose.machine_learning.tfrecord_file
+   wormpose.pose.centerline
+   wormpose.pose.distance_metrics
+   wormpose.pose.eigenworms
+   wormpose.pose.headtail_resolution
+   wormpose.pose.postures_model
+   wormpose.pose.results_datatypes
+   wormpose.version

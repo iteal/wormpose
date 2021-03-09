@@ -1,0 +1,5 @@
+﻿wormpose.dataset.loaders.resizer
+================================
+
+.. automodule:: wormpose.dataset.loaders.resizer
+    :members:
