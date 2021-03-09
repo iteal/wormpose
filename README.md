@@ -34,3 +34,5 @@ Check the [Documentation website](https://iteal.github.io/wormpose/index.html) f
 Laetitia Hebert, Tosif Ahamed, Antonio C. Costa, Liam O’Shaugnessy, Greg J. Stephens  
 bioRxiv 2020.07.09.193755; doi: https://doi.org/10.1101/2020.07.09.193755
 
+## Manuscript data 
+Manuscript data is available here: https://wormpose.unit.oist.jp.
