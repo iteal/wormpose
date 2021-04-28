@@ -4,7 +4,6 @@
 [![PyPI version](https://badge.fury.io/py/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
 [![Build Status](https://travis-ci.com/iteal/wormpose.svg?branch=main)](https://travis-ci.com/iteal/wormpose)
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/wormpose.svg)](https://pypi.python.org/pypi/wormpose/)
-[![DOI](https://zenodo.org/badge/246706178.svg)](https://zenodo.org/badge/latestdoi/246706178)
 [![Maintainability](https://img.shields.io/codeclimate/maintainability/iteal/wormpose)](https://codeclimate.com/github/iteal/wormpose/maintainability)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -30,9 +29,8 @@ This notebook goes over the whole WormPose pipeline with some sample data and an
 Check the [Documentation website](https://iteal.github.io/wormpose/index.html) for detailed instructions.
 
 ## Read the paper
-*WormPose: Image synthesis and convolutional networks for pose estimation in C. elegans*  
-Laetitia Hebert, Tosif Ahamed, Antonio C. Costa, Liam O’Shaugnessy, Greg J. Stephens  
-bioRxiv 2020.07.09.193755; doi: https://doi.org/10.1101/2020.07.09.193755
+[WormPose: Image synthesis and convolutional networks for pose estimation in C. elegans](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1008914)  
+Hebert L, Ahamed T, Costa AC, O’Shaughnessy L, Stephens GJ (2021) WormPose: Image synthesis and convolutional networks for pose estimation in C. elegans. PLOS Computational Biology 17(4): e1008914. https://doi.org/10.1371/journal.pcbi.1008914
 
 ## Manuscript data 
 Manuscript data is available here: https://wormpose.unit.oist.jp.
