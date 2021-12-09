@@ -25,15 +25,15 @@ Each subdirectory contains one video, the file tree should look like below (note
 
 For using `Open Worm Movement Database <http://movement.openworm.org/>`__ videos from the `Zenodo <https://zenodo.org/>`__ website, we provide a `download script <https://github.com/iteal/wormpose_data/tree/main/datasets/tierpsy>`__ that will create the file tree described above.
 
-**Limitations**
+**Limitations and troubleshooting**
 
 Please use the option "extract timestamp" in Tierpsy so that the field "timestamp/raw" is set in the hdf5 file. The configuration without the timestamp is not currently supported in WormPose.
 
 For Tierpsy files with several worm indexes per file, WormPose will only load one worm, the one with the smallest index.
 
-**Troubleshooting**
+The Tierpsy coordinates loader uses the 'skeleton' key of the file {video_name}_features.hdf5 or {video_name}_featuresN.hdf5. Please verify that the coordinates of this table are in pixels and not microns or another unit. You may need to leave the default value of Microns Per Pixel = -1.00 in Tierpsy so that the skeletons values stay in image pixel coordinates.
 
-Please contact the authors for any problems loading Tierpsy tracker files. Some features may not be implemented.
+Please contact the authors for any problems loading Tierpsy tracker files. Some features may not be implemented, the notebook check_dataset.ipynb is a good starting point to troubleshoot Tierpsy dataset loading issues.
 
 **Advanced use**
 

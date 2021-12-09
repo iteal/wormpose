@@ -82,12 +82,6 @@ class ResultsScoring(object):
             with open(result_filename, "rb") as f:
                 results_scores, results_skel = pickle.load(f)
 
-            # handle case for results containing one centerline
-            if len(results_scores.shape) == 1:
-                results_scores = results_scores[:, np.newaxis]
-            if len(results_skel.shape) == 3:
-                results_skel = results_skel[:, np.newaxis]
-
             matching_scores.append(results_scores)
             matching_skeletons.append(results_skel)
             os.remove(result_filename)
@@ -194,10 +188,6 @@ def _compare_pred_real(
 
                 all_scores[index][flip_index] = score
                 all_skel[index][flip_index] = synth_skel
-
-        # for one centerline case
-        all_scores = all_scores.squeeze()
-        all_skel = all_skel.squeeze()
 
         out_filename = os.path.join(temp_dir, f"compare_results_{chunk_index:09d}.pkl")
 
