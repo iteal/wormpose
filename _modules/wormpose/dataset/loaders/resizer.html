@@ -1,0 +1,265 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.dataset.loaders.resizer &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/alabaster.css" />
+    <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
+    <script src="../../../../_static/jquery.js"></script>
+    <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.dataset.loaders.resizer</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Handles all about the optional resizing of the images of a Dataset</span>
+
+<span class="sd">It will modify the FeaturesDataset and the FramesDataset to update with the resized values.</span>
+
+<span class="sd">The resize parameter can be specified as a single number (ex: 2 for upscale to twice the size, or 0.5 to downscale half the size)</span>
+<span class="sd">or as the desired image size, in that case, the resize factor will be calculated depending on the average worm length</span>
+<span class="sd">in the dataset.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
+
+<span class="kn">import</span> <span class="nn">cv2</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.base_dataset</span> <span class="kn">import</span> <span class="n">BaseFeaturesDataset</span><span class="p">,</span> <span class="n">BaseFramesDataset</span>
+
+<span class="kn">from</span> <span class="nn">wormpose.dataset.features</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">calculate_max_average_worm_length</span><span class="p">,</span>
+    <span class="n">calculate_crop_window_size</span><span class="p">,</span>
+    <span class="n">MINIMUM_IMAGE_SIZE</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="ResizeOptions"><a class="viewcode-back" href="../../../../_autosummary/wormpose.dataset.loaders.resizer.html#wormpose.dataset.loaders.resizer.ResizeOptions">[docs]</a><span class="k">class</span> <span class="nc">ResizeOptions</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class handling the possible resize options: either a scaling factor, or a set image size</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resize_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">image_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resize_factor</span> <span class="o">=</span> <span class="n">resize_factor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span> <span class="o">=</span> <span class="n">image_size</span>
+
+        <span class="c1"># validate</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;If image size is set, it should be an even number&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span> <span class="o">&lt;</span> <span class="n">MINIMUM_IMAGE_SIZE</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Image size must be bigger than </span><span class="si">{</span><span class="n">MINIMUM_IMAGE_SIZE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update_resize_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">features_dataset</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">resize_factor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">worm_length</span> <span class="o">=</span> <span class="n">calculate_max_average_worm_length</span><span class="p">(</span><span class="n">features_dataset</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">resize_factor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span> <span class="o">/</span> <span class="n">worm_length</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">resize_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+    <span class="k">def</span> <span class="nf">get_image_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">features_dataset</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_image_size</span>
+
+        <span class="k">return</span> <span class="n">calculate_crop_window_size</span><span class="p">(</span><span class="n">features_dataset</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="add_resizing_arguments"><a class="viewcode-back" href="../../../../_autosummary/wormpose.dataset.loaders.resizer.html#wormpose.dataset.loaders.resizer.add_resizing_arguments">[docs]</a><span class="k">def</span> <span class="nf">add_resizing_arguments</span><span class="p">(</span><span class="n">parser</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    For command line arguments, adds two mutually exclusive resize options: either a scaling factor, or a set image size</span>
+
+<span class="sd">    :param parser: Argparse parser</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">()</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--resize_factor&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Option to resize the images. &quot;</span>
+        <span class="s2">&quot;Examples: &#39;0.5&#39; downscale half, &#39;2&#39; upscale twice, &#39;1&#39; no resizing (default)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--image_size&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Option to resize the images so that the average worm of the dataset &quot;</span>
+        <span class="s2">&quot;fits into a square image of side: image_size&quot;</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<span class="k">class</span> <span class="nc">ResizedFrames</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scale_factor</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">frames</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">=</span> <span class="n">frames</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale_factor</span> <span class="o">=</span> <span class="n">scale_factor</span>
+
+    <span class="k">def</span> <span class="nf">_resize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">cv2</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">dsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_factor</span><span class="p">,</span> <span class="n">fy</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_factor</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">slice</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Slicing notation not implemented with resizer.&quot;</span><span class="p">)</span>
+        <span class="n">orig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resize</span><span class="p">(</span><span class="n">orig</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">orig</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resize</span><span class="p">(</span><span class="n">orig</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">ResizedFramesReader</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frames_reader</span><span class="p">,</span> <span class="n">resize_factor</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames_reader</span> <span class="o">=</span> <span class="n">frames_reader</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resize_factor</span> <span class="o">=</span> <span class="n">resize_factor</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resized_frames</span> <span class="o">=</span> <span class="n">ResizedFrames</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resize_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames_reader</span><span class="o">.</span><span class="fm">__enter__</span><span class="p">())</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">resized_frames</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resized_frames</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames_reader</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="frames_dataset_resizer"><a class="viewcode-back" href="../../../../_autosummary/wormpose.dataset.loaders.resizer.html#wormpose.dataset.loaders.resizer.frames_dataset_resizer">[docs]</a><span class="k">def</span> <span class="nf">frames_dataset_resizer</span><span class="p">(</span><span class="n">frames_dataset_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseFramesDataset</span><span class="p">],</span> <span class="n">resize_factor</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Modifies a FramesDataset class so that all frames are resized by resize_factor</span>
+
+<span class="sd">    :param frames_dataset_class: original FramesDataset class without resizing</span>
+<span class="sd">    :param resize_factor: by how much to rescale the images</span>
+<span class="sd">    :return: new FramesDataset with resizing</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">old_open</span> <span class="o">=</span> <span class="n">frames_dataset_class</span><span class="o">.</span><span class="n">open</span>
+
+    <span class="k">def</span> <span class="nf">resizer_open</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">frames_reader</span> <span class="o">=</span> <span class="n">old_open</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ResizedFramesReader</span><span class="p">(</span><span class="n">frames_reader</span><span class="p">,</span> <span class="n">resize_factor</span><span class="o">=</span><span class="n">resize_factor</span><span class="p">)</span>
+
+    <span class="n">frames_dataset_class</span><span class="o">.</span><span class="n">open</span> <span class="o">=</span> <span class="n">resizer_open</span>
+    <span class="k">return</span> <span class="n">frames_dataset_class</span></div>
+
+
+<div class="viewcode-block" id="features_dataset_resizer"><a class="viewcode-back" href="../../../../_autosummary/wormpose.dataset.loaders.resizer.html#wormpose.dataset.loaders.resizer.features_dataset_resizer">[docs]</a><span class="k">def</span> <span class="nf">features_dataset_resizer</span><span class="p">(</span><span class="n">features_dataset_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseFeaturesDataset</span><span class="p">],</span> <span class="n">resize_factor</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Modifies a FeaturesDataset class so that all features are resized by resize_factor</span>
+
+<span class="sd">    :param frames_dataset_class: original FeaturesDataset class without resizing</span>
+<span class="sd">    :param resize_factor: by how much to rescale the features</span>
+<span class="sd">    :return: new FeaturesDataset with resizing</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">old_get</span> <span class="o">=</span> <span class="n">features_dataset_class</span><span class="o">.</span><span class="n">get_features</span>
+
+    <span class="k">def</span> <span class="nf">resizer_get</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">features</span> <span class="o">=</span> <span class="n">old_get</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="n">new_features</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+        <span class="n">new_features</span><span class="p">[</span><span class="s2">&quot;skeletons&quot;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">resize_factor</span>
+        <span class="n">new_features</span><span class="p">[</span><span class="s2">&quot;head_width&quot;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">resize_factor</span>
+        <span class="n">new_features</span><span class="p">[</span><span class="s2">&quot;midbody_width&quot;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">resize_factor</span>
+        <span class="n">new_features</span><span class="p">[</span><span class="s2">&quot;tail_width&quot;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">resize_factor</span>
+        <span class="k">return</span> <span class="n">new_features</span>
+
+    <span class="n">features_dataset_class</span><span class="o">.</span><span class="n">get_features</span> <span class="o">=</span> <span class="n">resizer_get</span>
+    <span class="k">return</span> <span class="n">features_dataset_class</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.dataset.base_dataset &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.dataset.base_dataset</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module contains the WormPose API: abstract classes to subclass in order to add a custom dataset</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+
+<div class="viewcode-block" id="BaseFramePreprocessing"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseFramePreprocessing">[docs]</a><span class="k">class</span> <span class="nc">BaseFramePreprocessing</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specific image processing logic to isolate the worm in the dataset images</span>
+<span class="sd">    This object must be pickable (no inner functions for example)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="BaseFramePreprocessing.process"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseFramePreprocessing.process">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Segment the worm object of interest in the image: returns a mask image of the same shape as frame,</span>
+<span class="sd">        where the pixels belong to the worm object of interest are 1, and all the others are 0</span>
+<span class="sd">        Also calculates the average value of the background pixels.</span>
+
+<span class="sd">        :param frame: image to process</span>
+<span class="sd">        :return: Segmentation mask image , background color</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="BaseFramesDataset"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseFramesDataset">[docs]</a><span class="k">class</span> <span class="nc">BaseFramesDataset</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specific code to the dataset to access the frames only.</span>
+<span class="sd">    A dataset is divided into several &quot;videos&quot;. Each video contain a list of images or &quot;frames&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="BaseFramesDataset.video_names"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseFramesDataset.video_names">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">video_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A dataset is composed of several videos</span>
+
+<span class="sd">        :return: A list of unique ids (string) identifying a video in the dataset</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="BaseFramesDataset.open"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseFramesDataset.open">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">video_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The frames of the dataset are accessed trough a context manager object, in this way we have the option of not</span>
+<span class="sd">        entirely loading a big image array in memory if possible</span>
+
+<span class="sd">        :param video_name: One video unique id (should be one value of video_names())</span>
+<span class="sd">        :return: A context manager object that can be used with the &quot;with&quot; python statement giving access to the</span>
+<span class="sd">            frames (array of images) of the dataset</span>
+<span class="sd">            Example use : frames = open(&quot;video0&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="BaseFeaturesDataset"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseFeaturesDataset">[docs]</a><span class="k">class</span> <span class="nc">BaseFeaturesDataset</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specific code to the dataset to access the features for each video of the dataset</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="BaseFeaturesDataset.get_features"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseFeaturesDataset.get_features">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">get_features</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">video_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a dictionary of features</span>
+
+<span class="sd">        :return: dictionary with keys: skeletons, head_width, midbody_width, tail_width, frame_rate, ventral_side, timestamp</span>
+<span class="sd">            WHERE</span>
+<span class="sd">            skeletons: Coordinates x y of the centerline for each frame in pixel coordinates,</span>
+<span class="sd">            a numpy floating point array of shape (N number of frames, J number of joints, 2)</span>
+<span class="sd">            The quality of the synthetic images will start degrading when J &lt; 50, consider interpolating if less joints</span>
+<span class="sd">            head_width: numpy floating point array of shape N</span>
+<span class="sd">            midbody_width: numpy floating point array of shape N</span>
+<span class="sd">            tail_width: numpy floating point array of shape N</span>
+<span class="sd">            frame_rate: One float number for the frame rate of the video.</span>
+<span class="sd">            ventral_side: Optional One string value for the entire video. \&#39;clockwise\&#39; or \&#39;anticlockwise\&#39;. If None, defaults to anticlockwise</span>
+<span class="sd">            timestamp: Optional Timestamp of each frame, a numpy array of shape (N number of frames). If None, will consider each frame to be equidistant in time</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="BaseResultsExporter"><a class="viewcode-back" href="../../../_autosummary/wormpose.dataset.base_dataset.html#wormpose.dataset.base_dataset.BaseResultsExporter">[docs]</a><span class="k">class</span> <span class="nc">BaseResultsExporter</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Optional Results Exporter</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">export</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">video_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

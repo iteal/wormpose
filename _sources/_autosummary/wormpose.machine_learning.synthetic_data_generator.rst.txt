@@ -1,0 +1,5 @@
+﻿wormpose.machine_learning.synthetic_data_generator
+==================================================
+
+.. automodule:: wormpose.machine_learning.synthetic_data_generator
+    :members:

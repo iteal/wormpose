@@ -1,0 +1,401 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.commands.predict_dataset &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.commands.predict_dataset</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Predicts videos using a trained model</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span> <span class="k">as</span> <span class="nn">mp</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">from</span> <span class="nn">argparse</span> <span class="kn">import</span> <span class="n">Namespace</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+
+<span class="kn">from</span> <span class="nn">wormpose.commands</span> <span class="kn">import</span> <span class="n">_log_parameters</span>
+<span class="kn">from</span> <span class="nn">wormpose.commands.utils.results_saver</span> <span class="kn">import</span> <span class="n">ResultsSaver</span>
+<span class="kn">from</span> <span class="nn">wormpose.commands.utils.time_sampling</span> <span class="kn">import</span> <span class="n">resample_results</span>
+<span class="kn">from</span> <span class="nn">wormpose.config</span> <span class="kn">import</span> <span class="n">default_paths</span>
+<span class="kn">from</span> <span class="nn">wormpose.config.default_paths</span> <span class="kn">import</span> <span class="n">RESULTS_FILENAME</span><span class="p">,</span> <span class="n">CONFIG_FILENAME</span>
+<span class="kn">from</span> <span class="nn">wormpose.config.experiment_config</span> <span class="kn">import</span> <span class="n">load_config</span><span class="p">,</span> <span class="n">add_config_argument</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.features</span> <span class="kn">import</span> <span class="n">Features</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.image_processing.options</span> <span class="kn">import</span> <span class="n">WORM_IS_LIGHTER</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.loader</span> <span class="kn">import</span> <span class="n">get_dataset_name</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.loader</span> <span class="kn">import</span> <span class="n">load_dataset</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.loaders.resizer</span> <span class="kn">import</span> <span class="n">ResizeOptions</span>
+<span class="kn">from</span> <span class="nn">wormpose.images.scoring</span> <span class="kn">import</span> <span class="n">BaseScoringDataManager</span><span class="p">,</span> <span class="n">ScoringDataManager</span><span class="p">,</span> <span class="n">ResultsScoring</span>
+<span class="kn">from</span> <span class="nn">wormpose.machine_learning.best_models_saver</span> <span class="kn">import</span> <span class="n">BestModels</span>
+<span class="kn">from</span> <span class="nn">wormpose.machine_learning.predict_data_generator</span> <span class="kn">import</span> <span class="n">PredictDataGenerator</span>
+<span class="kn">from</span> <span class="nn">wormpose.pose.centerline</span> <span class="kn">import</span> <span class="n">skeletons_to_angles</span>
+<span class="kn">from</span> <span class="nn">wormpose.pose.headtail_resolution</span> <span class="kn">import</span> <span class="n">resolve_head_tail</span>
+<span class="kn">from</span> <span class="nn">wormpose.pose.results_datatypes</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ShuffledResults</span><span class="p">,</span>
+    <span class="n">OriginalResults</span><span class="p">,</span>
+    <span class="n">BaseResults</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">()</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<span class="n">tf</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_make_tf_dataset</span><span class="p">(</span><span class="n">data_generator</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">image_shape</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">video_name</span><span class="p">):</span>
+        <span class="n">data_gen</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">data_generator</span><span class="o">.</span><span class="n">run</span><span class="p">,</span> <span class="n">video_name</span><span class="o">=</span><span class="n">video_name</span><span class="p">)</span>
+        <span class="n">tf_dset</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="o">.</span><span class="n">from_generator</span><span class="p">(</span>
+            <span class="n">data_gen</span><span class="p">,</span>
+            <span class="n">tf</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+            <span class="n">tf</span><span class="o">.</span><span class="n">TensorShape</span><span class="p">([</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">image_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">image_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">]),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">tf_dset</span>
+
+    <span class="k">return</span> <span class="n">run</span>
+
+
+<span class="k">def</span> <span class="nf">_can_resolve_results</span><span class="p">(</span><span class="n">shuffled_results</span><span class="p">:</span> <span class="n">ShuffledResults</span><span class="p">,</span> <span class="n">score_threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">video_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="n">shuffled_results</span><span class="o">.</span><span class="n">scores</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">scores</span><span class="p">)):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calculated scores are all invalid, stopping analysis for </span><span class="si">{</span><span class="n">video_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">score_threshold</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;There is not one frame where the error metric is above the threshold </span><span class="si">{</span><span class="n">score_threshold</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;in the whole video </span><span class="si">{</span><span class="n">video_name</span><span class="si">}</span><span class="s2">, stopping analysis. Maybe the model didn&#39;t train properly.&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+
+<span class="k">class</span> <span class="nc">_Predictor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">results_scoring</span><span class="p">:</span> <span class="n">ResultsScoring</span><span class="p">,</span> <span class="n">keras_model</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">keras_model</span> <span class="o">=</span> <span class="n">keras_model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results_scoring</span> <span class="o">=</span> <span class="n">results_scoring</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_frames</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">input_frames</span><span class="p">,</span>
+        <span class="n">scoring_data_manager</span><span class="p">:</span> <span class="n">BaseScoringDataManager</span><span class="p">,</span>
+        <span class="n">features</span><span class="p">:</span> <span class="n">Features</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">OriginalResults</span><span class="p">,</span> <span class="n">ShuffledResults</span><span class="p">]:</span>
+        <span class="c1"># run all frames through the neural network to get a result theta without head/tail decision</span>
+        <span class="n">network_predictions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">keras_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">input_frames</span><span class="p">)[:</span><span class="n">num_frames</span><span class="p">]</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Predicted </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">network_predictions</span><span class="p">)</span><span class="si">}</span><span class="s2"> frames&quot;</span><span class="p">)</span>
+
+        <span class="n">shuffled_results</span> <span class="o">=</span> <span class="n">ShuffledResults</span><span class="p">(</span><span class="n">random_theta</span><span class="o">=</span><span class="n">network_predictions</span><span class="p">)</span>
+
+        <span class="n">original_results</span> <span class="o">=</span> <span class="n">OriginalResults</span><span class="p">(</span>
+            <span class="n">theta</span><span class="o">=</span><span class="n">skeletons_to_angles</span><span class="p">(</span><span class="n">features</span><span class="o">.</span><span class="n">skeletons</span><span class="p">,</span> <span class="n">theta_dims</span><span class="o">=</span><span class="n">network_predictions</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+            <span class="n">skeletons</span><span class="o">=</span><span class="n">features</span><span class="o">.</span><span class="n">skeletons</span><span class="p">,</span>
+            <span class="n">scores</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># calculate image similarity for each frame, for the two solutions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results_scoring</span><span class="p">(</span><span class="n">results</span><span class="o">=</span><span class="n">shuffled_results</span><span class="p">,</span> <span class="n">scoring_data_manager</span><span class="o">=</span><span class="n">scoring_data_manager</span><span class="p">)</span>
+
+        <span class="n">avg_score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">shuffled_results</span><span class="o">.</span><span class="n">scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calculated image similarity, average: </span><span class="si">{</span><span class="n">avg_score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">resample_results</span><span class="p">(</span><span class="n">shuffled_results</span><span class="p">,</span> <span class="n">features</span><span class="o">.</span><span class="n">timestamp</span><span class="p">)</span>
+        <span class="n">resample_results</span><span class="p">(</span><span class="n">original_results</span><span class="p">,</span> <span class="n">features</span><span class="o">.</span><span class="n">timestamp</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">original_results</span><span class="p">,</span> <span class="n">shuffled_results</span>
+
+
+<span class="k">def</span> <span class="nf">_apply_resize_factor</span><span class="p">(</span><span class="n">results</span><span class="p">:</span> <span class="n">BaseResults</span><span class="p">,</span> <span class="n">resize_factor</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+    <span class="n">results</span><span class="o">.</span><span class="n">skeletons</span> <span class="o">/=</span> <span class="n">resize_factor</span>
+
+
+<span class="k">def</span> <span class="nf">_parse_arguments</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;work_dir&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;work_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">default_paths</span><span class="o">.</span><span class="n">WORK_DIR</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_process&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;num_process&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;batch_size&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;batch_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">512</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;score_threshold&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;score_threshold&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.7</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;video_names&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;video_names&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;random_seed&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;random_seed&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">])</span>
+
+    <span class="n">dataset_name</span> <span class="o">=</span> <span class="n">get_dataset_name</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">)</span>
+    <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;experiment_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;work_dir&quot;</span><span class="p">],</span> <span class="n">dataset_name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;model_path&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">default_models_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;experiment_dir&quot;</span><span class="p">],</span> <span class="n">default_paths</span><span class="o">.</span><span class="n">MODELS_DIRS</span><span class="p">)</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;model_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">BestModels</span><span class="p">(</span><span class="n">default_models_dir</span><span class="p">)</span><span class="o">.</span><span class="n">best_model_path</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;config&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;experiment_dir&quot;</span><span class="p">],</span> <span class="n">CONFIG_FILENAME</span><span class="p">)</span>
+
+    <span class="n">_log_parameters</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;dataset_path&quot;</span><span class="p">:</span> <span class="n">dataset_path</span><span class="p">})</span>
+    <span class="n">_log_parameters</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">Namespace</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="predict"><a class="viewcode-back" href="../../../_autosummary/wormpose.commands.predict_dataset.html#wormpose.commands.predict_dataset.predict">[docs]</a><span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Use a trained model to predict the centerlines of worm for videos in a dataset</span>
+
+<span class="sd">    :param dataset_path: Root path of the dataset containing videos of worm</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">_parse_arguments</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">mp</span><span class="o">.</span><span class="n">set_start_method</span><span class="p">(</span><span class="s2">&quot;spawn&quot;</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">random_seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TF_DETERMINISTIC_OPS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">random_seed</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">random_seed</span><span class="p">)</span>
+        <span class="n">tf</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">set_seed</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">random_seed</span><span class="p">)</span>
+
+    <span class="n">results_root_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">experiment_dir</span><span class="p">,</span> <span class="n">default_paths</span><span class="o">.</span><span class="n">RESULTS_DIR</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">results_root_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">config</span> <span class="o">=</span> <span class="n">load_config</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span>
+        <span class="n">dataset_loader</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">dataset_loader</span><span class="p">,</span>
+        <span class="n">dataset_path</span><span class="o">=</span><span class="n">dataset_path</span><span class="p">,</span>
+        <span class="n">selected_video_names</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">video_names</span><span class="p">,</span>
+        <span class="n">resize_options</span><span class="o">=</span><span class="n">ResizeOptions</span><span class="p">(</span><span class="n">resize_factor</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">resize_factor</span><span class="p">),</span>
+        <span class="o">**</span><span class="p">{</span><span class="n">WORM_IS_LIGHTER</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">worm_is_lighter</span><span class="p">},</span>
+    <span class="p">)</span>
+
+    <span class="n">keras_model</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_path</span><span class="p">,</span> <span class="nb">compile</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">results_saver</span> <span class="o">=</span> <span class="n">ResultsSaver</span><span class="p">(</span>
+        <span class="n">temp_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">temp_dir</span><span class="p">,</span> <span class="n">results_root_dir</span><span class="o">=</span><span class="n">results_root_dir</span><span class="p">,</span> <span class="n">results_filename</span><span class="o">=</span><span class="n">RESULTS_FILENAME</span>
+    <span class="p">)</span>
+
+    <span class="n">tf_dataset_maker</span> <span class="o">=</span> <span class="n">_make_tf_dataset</span><span class="p">(</span>
+        <span class="n">data_generator</span><span class="o">=</span><span class="n">PredictDataGenerator</span><span class="p">(</span>
+            <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
+            <span class="n">num_process</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">num_process</span><span class="p">,</span>
+            <span class="n">temp_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">temp_dir</span><span class="p">,</span>
+            <span class="n">image_shape</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">image_shape</span><span class="p">,</span>
+            <span class="n">batch_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">image_shape</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">image_shape</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">results_scoring</span> <span class="o">=</span> <span class="n">ResultsScoring</span><span class="p">(</span>
+        <span class="n">frame_preprocessing</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">frame_preprocessing</span><span class="p">,</span>
+        <span class="n">num_process</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">num_process</span><span class="p">,</span>
+        <span class="n">temp_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">temp_dir</span><span class="p">,</span>
+        <span class="n">image_shape</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">image_shape</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">_Predictor</span><span class="p">(</span><span class="n">results_scoring</span><span class="o">=</span><span class="n">results_scoring</span><span class="p">,</span> <span class="n">keras_model</span><span class="o">=</span><span class="n">keras_model</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">video_name</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">video_names</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Processing video: &quot;</span><span class="si">{</span><span class="n">video_name</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="n">features</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span>
+
+        <span class="n">template_indexes</span> <span class="o">=</span> <span class="n">features</span><span class="o">.</span><span class="n">labelled_indexes</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">template_indexes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Can&#39;t calculate image metric, there is no labelled frame in the video to use as a template, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;stopping analysis for </span><span class="si">{</span><span class="n">video_name</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="n">original_results</span><span class="p">,</span> <span class="n">shuffled_results</span> <span class="o">=</span> <span class="n">predictor</span><span class="p">(</span>
+            <span class="n">input_frames</span><span class="o">=</span><span class="n">tf_dataset_maker</span><span class="p">(</span><span class="n">video_name</span><span class="p">),</span>
+            <span class="n">num_frames</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">num_frames</span><span class="p">(</span><span class="n">video_name</span><span class="p">),</span>
+            <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+            <span class="n">scoring_data_manager</span><span class="o">=</span><span class="n">ScoringDataManager</span><span class="p">(</span>
+                <span class="n">video_name</span><span class="o">=</span><span class="n">video_name</span><span class="p">,</span>
+                <span class="n">frames_dataset</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">frames_dataset</span><span class="p">,</span>
+                <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="n">results</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;original&quot;</span><span class="p">:</span> <span class="n">original_results</span><span class="p">,</span> <span class="s2">&quot;unaligned&quot;</span><span class="p">:</span> <span class="n">shuffled_results</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">_can_resolve_results</span><span class="p">(</span>
+            <span class="n">shuffled_results</span><span class="p">,</span>
+            <span class="n">video_name</span><span class="o">=</span><span class="n">video_name</span><span class="p">,</span>
+            <span class="n">score_threshold</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">score_threshold</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">final_results</span> <span class="o">=</span> <span class="n">resolve_head_tail</span><span class="p">(</span>
+                <span class="n">shuffled_results</span><span class="o">=</span><span class="n">shuffled_results</span><span class="p">,</span>
+                <span class="n">original_results</span><span class="o">=</span><span class="n">original_results</span><span class="p">,</span>
+                <span class="n">frame_rate</span><span class="o">=</span><span class="n">features</span><span class="o">.</span><span class="n">frame_rate</span><span class="p">,</span>
+                <span class="n">score_threshold</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">score_threshold</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;resolved&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">final_results</span>
+            <span class="n">_apply_resize_factor</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;resolved&quot;</span><span class="p">],</span> <span class="n">config</span><span class="o">.</span><span class="n">resize_factor</span><span class="p">)</span>
+
+        <span class="n">_apply_resize_factor</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;unaligned&quot;</span><span class="p">],</span> <span class="n">config</span><span class="o">.</span><span class="n">resize_factor</span><span class="p">)</span>
+
+        <span class="n">results_saver</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">results</span><span class="o">=</span><span class="n">results</span><span class="p">,</span> <span class="n">video_name</span><span class="o">=</span><span class="n">video_name</span><span class="p">)</span>
+
+    <span class="c1"># cleanup</span>
+    <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">temp_dir</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="kn">import</span> <span class="nn">argparse</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
+
+    <span class="c1"># model infos</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--model_path&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Load model from this path, or use best model from work_dir.&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--batch_size&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="c1"># inputs</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;dataset_path&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--video_names&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Only analyze a subset of videos. If not set, will analyze all videos in dataset_path.&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">add_config_argument</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--temp_dir&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Where to store temporary intermediate results&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--work_dir&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Root folder for all experiments&quot;</span><span class="p">)</span>
+    <span class="c1"># multiprocessing params</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--num_process&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;How many worker processes&quot;</span><span class="p">)</span>
+    <span class="c1"># parameters of results processing</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--score_threshold&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Image metric score threshold : discard results scoring lower than this value.&quot;</span>
+        <span class="s2">&quot; Fine tune this value using the script calibrate_dataset.py&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--random_seed&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Optional random seed for deterministic results&quot;</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="n">predict</span><span class="p">(</span><span class="o">**</span><span class="nb">vars</span><span class="p">(</span><span class="n">args</span><span class="p">))</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

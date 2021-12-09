@@ -1,0 +1,5 @@
+﻿wormpose.config.experiment_config
+=================================
+
+.. automodule:: wormpose.config.experiment_config
+    :members:

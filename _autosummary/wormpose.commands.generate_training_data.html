@@ -1,0 +1,189 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>wormpose.commands.generate_training_data &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="wormpose.commands.postprocess_results" href="wormpose.commands.postprocess_results.html" />
+    <link rel="prev" title="wormpose.commands.export_results" href="wormpose.commands.export_results.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-wormpose.commands.generate_training_data">
+<span id="wormpose-commands-generate-training-data"></span><h1>wormpose.commands.generate_training_data<a class="headerlink" href="#module-wormpose.commands.generate_training_data" title="Permalink to this headline">¶</a></h1>
+<p>Generates the training and evaluation data from a dataset.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="wormpose.commands.generate_training_data.generate">
+<span class="sig-prename descclassname"><span class="pre">wormpose.commands.generate_training_data.</span></span><span class="sig-name descname"><span class="pre">generate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset_loader</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/wormpose/commands/generate_training_data.html#generate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#wormpose.commands.generate_training_data.generate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate synthetic images (training data) and processed real images (evaluation data)
+and save them to TFrecord files using multiprocessing</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset_loader</strong> – Name of the dataset loader, for example “tierpsy”</p></li>
+<li><p><strong>dataset_path</strong> – Root path of the dataset containing videos of worm</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../documentation.html">Documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.calibrate_dataset.html">wormpose.commands.calibrate_dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.evaluate_model.html">wormpose.commands.evaluate_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.export_results.html">wormpose.commands.export_results</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">wormpose.commands.generate_training_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.postprocess_results.html">wormpose.commands.postprocess_results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.predict_dataset.html">wormpose.commands.predict_dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.train_model.html">wormpose.commands.train_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.utils.results_saver.html">wormpose.commands.utils.results_saver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.utils.time_sampling.html">wormpose.commands.utils.time_sampling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.commands.visualize_results.html">wormpose.commands.visualize_results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.config.default_paths.html">wormpose.config.default_paths</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.config.experiment_config.html">wormpose.config.experiment_config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.base_dataset.html">wormpose.dataset.base_dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.features.html">wormpose.dataset.features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.image_processing.frame_preprocessor.html">wormpose.dataset.image_processing.frame_preprocessor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.image_processing.image_utils.html">wormpose.dataset.image_processing.image_utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.image_processing.options.html">wormpose.dataset.image_processing.options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.image_processing.simple_frame_preprocessing.html">wormpose.dataset.image_processing.simple_frame_preprocessing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loader.html">wormpose.dataset.loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loaders.hdf5features.html">wormpose.dataset.loaders.hdf5features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loaders.images_folder.html">wormpose.dataset.loaders.images_folder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loaders.resizer.html">wormpose.dataset.loaders.resizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loaders.sample_data.html">wormpose.dataset.loaders.sample_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loaders.tierpsy.features_dataset.html">wormpose.dataset.loaders.tierpsy.features_dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loaders.tierpsy.frames_dataset.html">wormpose.dataset.loaders.tierpsy.frames_dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.dataset.loaders.tierpsy.results_exporter.html">wormpose.dataset.loaders.tierpsy.results_exporter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.demo.real_simple_visualizer.html">wormpose.demo.real_simple_visualizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.demo.synthetic_simple_visualizer.html">wormpose.demo.synthetic_simple_visualizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.images.real_dataset.html">wormpose.images.real_dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.images.scoring.centerline_accuracy_check.html">wormpose.images.scoring.centerline_accuracy_check</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.images.scoring.image_scoring.html">wormpose.images.scoring.image_scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.images.scoring.results_scoring.html">wormpose.images.scoring.results_scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.images.scoring.scoring_data_manager.html">wormpose.images.scoring.scoring_data_manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.images.synthetic.synthetic_dataset.html">wormpose.images.synthetic.synthetic_dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.images.worm_drawing.html">wormpose.images.worm_drawing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.best_models_saver.html">wormpose.machine_learning.best_models_saver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.eval_data_generator.html">wormpose.machine_learning.eval_data_generator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.generic_file_writer.html">wormpose.machine_learning.generic_file_writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.loss.html">wormpose.machine_learning.loss</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.model.html">wormpose.machine_learning.model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.predict_data_generator.html">wormpose.machine_learning.predict_data_generator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.synthetic_data_generator.html">wormpose.machine_learning.synthetic_data_generator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.machine_learning.tfrecord_file.html">wormpose.machine_learning.tfrecord_file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.pose.centerline.html">wormpose.pose.centerline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.pose.distance_metrics.html">wormpose.pose.distance_metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.pose.eigenworms.html">wormpose.pose.eigenworms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.pose.headtail_resolution.html">wormpose.pose.headtail_resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.pose.postures_model.html">wormpose.pose.postures_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.pose.results_datatypes.html">wormpose.pose.results_datatypes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="wormpose.version.html">wormpose.version</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="../documentation.html">Documentation of WormPose.</a><ul>
+      <li>Previous: <a href="wormpose.commands.export_results.html" title="previous chapter">wormpose.commands.export_results</a></li>
+      <li>Next: <a href="wormpose.commands.postprocess_results.html" title="next chapter">wormpose.commands.postprocess_results</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/wormpose.commands.generate_training_data.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

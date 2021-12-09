@@ -1,0 +1,160 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Use with Tierpsy tracker &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Load custom data" href="custom_loader.html" />
+    <link rel="prev" title="WormPose pipeline" href="pipeline.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="use-with-tierpsy-tracker">
+<span id="tierpsy"></span><h1>Use with Tierpsy tracker<a class="headerlink" href="#use-with-tierpsy-tracker" title="Permalink to this headline">¶</a></h1>
+<p>WormPose can load use Tierpsy tracker data, by specifying:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dataset_loader</span><span class="o">=</span><span class="s2">&quot;tierpsy&quot;</span>
+</pre></div>
+</div>
+<p>Create a root folder for an experiment, containing videos of similar recording conditions if possible.
+Each subdirectory contains one video, the file tree should look like below (note the names of the subfolder match the names of the files):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>+-- dataset_path
+<span class="p">|</span>   +-- video_name0
+<span class="p">|</span>   <span class="p">|</span>   +-- video_name0.hdf5
+<span class="p">|</span>   <span class="p">|</span>   +-- video_name0_features.hdf5  or video_name0_featuresN.hdf5
+<span class="p">|</span>   +-- video_name1
+<span class="p">|</span>   <span class="p">|</span>   +-- video_name1.hdf5
+<span class="p">|</span>   <span class="p">|</span>   +-- video_name1_features.hdf5 or video_name1_featuresN.hdf5
+<span class="p">|</span>   ...
+</pre></div>
+</div>
+<p>For using <a class="reference external" href="http://movement.openworm.org/">Open Worm Movement Database</a> videos from the <a class="reference external" href="https://zenodo.org/">Zenodo</a> website, we provide a <a class="reference external" href="https://github.com/iteal/wormpose_data/tree/main/datasets/tierpsy">download script</a> that will create the file tree described above.</p>
+<p><strong>Limitations and troubleshooting</strong></p>
+<p>Please use the option “extract timestamp” in Tierpsy so that the field “timestamp/raw” is set in the hdf5 file. The configuration without the timestamp is not currently supported in WormPose.</p>
+<p>For Tierpsy files with several worm indexes per file, WormPose will only load one worm, the one with the smallest index.</p>
+<p>The Tierpsy coordinates loader uses the ‘skeleton’ key of the file {video_name}_features.hdf5 or {video_name}_featuresN.hdf5. Please verify that the coordinates of this table are in pixels and not microns or another unit. You may need to leave the default value of Microns Per Pixel = -1.00 in Tierpsy so that the skeletons values stay in image pixel coordinates.</p>
+<p>Please contact the authors for any problems loading Tierpsy tracker files. Some features may not be implemented, the notebook check_dataset.ipynb is a good starting point to troubleshoot Tierpsy dataset loading issues.</p>
+<p><strong>Advanced use</strong></p>
+<p>The Tierpsy Dataset loader uses the default <cite>SimpleFrameProcessing</cite> class to segment the worms from the background. If this doesn’t work for your images and you have a custom function to segment the worms from the background, you should implement a custom Dataset loader.
+You can still use the tierpsy <cite>FramesDataset</cite> and <cite>FeaturesDataset</cite> provided, but you will need to reimplement <cite>FramePreprocessing</cite>.</p>
+<p>Follow the example of toy_dataset to add a custom Dataset loader, which will look like below:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">wormpose</span> <span class="kn">import</span> <span class="n">BaseFramePreprocessing</span>
+
+<span class="c1"># We use the Tierpsy loaders from WormPose</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.loaders.tierpsy</span> <span class="kn">import</span> <span class="n">FramesDataset</span><span class="p">,</span> <span class="n">FeaturesDataset</span>
+
+<span class="c1"># But we redefine a custom frame preprocessing function</span>
+<span class="k">class</span> <span class="nc">FramePreprocessing</span><span class="p">(</span><span class="n">BaseFramePreprocessing</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">)</span>
+
+        <span class="n">segmented_frame</span> <span class="o">=</span> <span class="c1">#TODO segment the frame, or load if precalculated</span>
+        <span class="n">background_color</span> <span class="o">=</span> <span class="c1">#TODO find the background color</span>
+        <span class="k">return</span> <span class="n">segmented_frame</span><span class="p">,</span> <span class="n">background_color</span>
+</pre></div>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="pipeline.html" title="previous chapter">WormPose pipeline</a></li>
+      <li>Next: <a href="custom_loader.html" title="next chapter">Load custom data</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/tierpsy.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

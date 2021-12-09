@@ -1,0 +1,5 @@
+﻿wormpose.pose.postures_model
+============================
+
+.. automodule:: wormpose.pose.postures_model
+    :members:

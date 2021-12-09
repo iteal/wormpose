@@ -1,0 +1,232 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>WormPose pipeline &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Use with Tierpsy tracker" href="tierpsy.html" />
+    <link rel="prev" title="Installation" href="install.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="wormpose-pipeline">
+<h1>WormPose pipeline<a class="headerlink" href="#wormpose-pipeline" title="Permalink to this headline">¶</a></h1>
+<p>There are several commands to run one at a time, please run all the commands from the same folder.</p>
+<section id="assemble-a-dataset">
+<h2>1 - Assemble a dataset<a class="headerlink" href="#assemble-a-dataset" title="Permalink to this headline">¶</a></h2>
+<p><img alt="image0" src="https://i.imgur.com/rwZvTB9.png" /></p>
+<p>WormPose analyzes single worm videos where the simple non-coiled
+centerlines have already been calculated with another worm tracker, for
+example the <a class="reference external" href="https://github.com/ver228/tierpsy-tracker">Tierpsy
+tracker</a>. The tierpsy
+format is supported out of the box for a single worm per video,
+check the <a class="reference internal" href="tierpsy.html#tierpsy"><span class="std std-ref">Use with Tierpsy tracker</span></a> guide to setup a Tierpsy dataset.</p>
+<p>There is also a simple dataset used in the tutorials, which is a folder of images
+associated with a HDF5 file for the features. You can also assemble your
+own dataset composed of worm videos associated with their features
+(<a class="reference external" href="https://github.com/iteal/wormpose/tree/main/examples/toy_dataset">instructions</a>).</p>
+</section>
+<section id="generate-training-data">
+<h2>2 - Generate training data<a class="headerlink" href="#generate-training-data" title="Permalink to this headline">¶</a></h2>
+<p><img alt="image1" src="https://i.imgur.com/czrSMCY.png" /></p>
+<p>The datagen command will create binary files *.tfrecord containing
+labeled images for training and evaluation, as well as a configuration
+file. This step can take some time, a system with several CPU cores is recommended.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose datagen DATASET_LOADER_NAME DATASET_PATH
+</pre></div>
+</div>
+<p>where DATASET_LOADER_NAME is “tierpsy” or “sample_data” or your custom
+loader name.</p>
+<p><strong>Warning</strong></p>
+<p>This command generates a file “config.json” storing the information about the data: image size, dataset loader, resize factor etc.
+This file needs to exist for the following steps to work. If you did not generate the training dataset and just want to predict new data for example, you need to obtain the configuration file (or regenerate a new one with the same parameters) and use the option –config to pass the path of the configuration file to the next scripts.</p>
+<p><strong>Troubleshooting</strong></p>
+<p>For the error <em>dataset_loader “tierpsy” (or other) not found in the package entry points</em>, please reinstall WormPose. If using Google Colab, please restart the runtime. If running WormPose source code directly, please run <cite>pip install -e .</cite> at the root level.</p>
+</section>
+<section id="train-the-neural-network">
+<h2>3 - Train the neural network<a class="headerlink" href="#train-the-neural-network" title="Permalink to this headline">¶</a></h2>
+<p>The neural network will be trained on the data generated from the
+previous command. This step can take some time, a GPU is recommended.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose train DATASET_PATH
+</pre></div>
+</div>
+</section>
+<section id="predict">
+<h2>4 - Predict<a class="headerlink" href="#predict" title="Permalink to this headline">¶</a></h2>
+<p><img alt="image2" src="https://i.imgur.com/KBhnG1s.png" /></p>
+<p>The network predicts the videos of the dataset, then there is a
+processing step to discard wrong results and obtain a final time series
+with a consistent head-tail orientation.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose predict DATASET_PATH
+</pre></div>
+</div>
+</section>
+<section id="extra-optional-commands">
+<h2>Extra optional commands<a class="headerlink" href="#extra-optional-commands" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Postprocess the results with interpolation and smoothing</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose postprocess DATASET_PATH
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Export the results in another format (only WCON format supported for
+Tierpsy data)</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose <span class="nb">export</span> DATASET_PATH
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Visualize the predictions as images</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose viz DATASET_PATH
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Calibrate to fine tune the image score threshold used during the
+prediction step</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose calibrate DATASET_LOADER_NAME DATASET_PATH
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Evaluate the trained model on new synthetic images</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose evaluate DATASET_PATH
+</pre></div>
+</div>
+</section>
+<section id="outputs">
+<h2>Outputs<a class="headerlink" href="#outputs" title="Permalink to this headline">¶</a></h2>
+<p>All output files will be stored in a “experiments” folder in the
+directory where the scripts are ran, or use the <code class="docutils literal notranslate"><span class="pre">--work_dir</span></code> option to
+specify a custom directory.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+--</span> <span class="n">experiments</span> <span class="p">(</span><span class="ow">or</span> <span class="n">the</span> <span class="n">value</span> <span class="n">of</span> <span class="n">work_dir</span><span class="p">)</span>
+<span class="o">|</span>   <span class="o">+--</span> <span class="n">dataset_name</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">config</span><span class="o">.</span><span class="n">json</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">training_data</span>  <span class="o">//</span> <span class="n">contains</span> <span class="n">the</span> <span class="n">generated</span> <span class="n">files</span> <span class="n">used</span> <span class="k">for</span> <span class="n">training</span> <span class="n">the</span> <span class="n">network</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="o">*.</span><span class="n">tfrecord</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">models</span>  <span class="o">//</span> <span class="n">contains</span> <span class="n">the</span> <span class="n">trained</span> <span class="n">models</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">results</span>  <span class="o">//</span> <span class="n">contains</span> <span class="n">the</span> <span class="n">video</span> <span class="n">analysis</span> <span class="n">results</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">video_name0</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">results</span><span class="o">.</span><span class="n">h5</span>  <span class="o">//</span> <span class="n">original</span> <span class="ow">and</span> <span class="n">new</span> <span class="n">angles</span> <span class="ow">and</span> <span class="n">skeletons</span><span class="p">,</span> <span class="n">image</span> <span class="n">scores</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">images_results</span><span class="o">.</span><span class="n">zip</span>  <span class="o">//</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">when</span> <span class="n">the</span> <span class="n">script</span> <span class="n">visualize_results</span> <span class="ow">is</span> <span class="n">run</span><span class="o">.</span> <span class="n">Visualize</span> <span class="n">predicted</span> <span class="n">skeletons</span> <span class="n">overlaid</span> <span class="n">on</span> <span class="n">top</span> <span class="n">of</span> <span class="n">the</span> <span class="n">original</span> <span class="n">frame</span><span class="o">.</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">+--</span> <span class="n">video_name1</span>
+<span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>   <span class="o">|</span>    <span class="o">...</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">WormPose pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#assemble-a-dataset">1 - Assemble a dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#generate-training-data">2 - Generate training data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#train-the-neural-network">3 - Train the neural network</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#predict">4 - Predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#extra-optional-commands">Extra optional commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#outputs">Outputs</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="install.html" title="previous chapter">Installation</a></li>
+      <li>Next: <a href="tierpsy.html" title="next chapter">Use with Tierpsy tracker</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/pipeline.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

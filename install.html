@@ -1,0 +1,153 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Installation &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="WormPose pipeline" href="pipeline.html" />
+    <link rel="prev" title="Overview" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<p><strong>Requirements</strong></p>
+<p>Install Python 3.6 or higher.</p>
+<p>This project make extensive use of multi processing, so we
+recommend you use a system with as many CPU cores as possible.</p>
+<p>A GPU is recommended to train the network, please check Tensorflow
+<a class="reference external" href="https://www.tensorflow.org/install/gpu">documentation</a> to install
+Tensorflow with GPU support.</p>
+<p><strong>Install with pip</strong></p>
+<p>You can install WormPose directly from the Python package index with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --upgrade wormpose
+</pre></div>
+</div>
+<p>This will install a command line command called <cite>wormpose</cite>, that you can call
+directly in the terminal. Alternatively, you can use Jupyter notebooks
+or directly call the Python functions.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># How to run wormpose from the terminal:</span>
+wormpose COMMAND ARGUMENTS
+
+<span class="c1"># The available commands are:</span>
+<span class="c1"># datagen, train, predict, postprocess, viz,</span>
+<span class="c1"># calibrate, evaluate, export</span>
+
+<span class="c1"># Get information on the arguments for each command by calling:</span>
+wormpose COMMAND -h
+</pre></div>
+</div>
+<p><strong>Troubleshooting</strong></p>
+<p>If the <cite>wormpose</cite> command is not found, maybe you installed WormPose with the pip option <code class="docutils literal notranslate"><span class="pre">--user</span></code>. Please check
+that the local user folder where pip installs the script is in your PATH
+variable.</p>
+<p><strong>Limitations</strong></p>
+<p>WormPose doesn’t support at the moment multiple worms in one image.</p>
+<p>Only grayscale images (1 channel) are supported.</p>
+<p>The resolution of the worm should not be too low, we have tested it successfully with images where the worm length was 90 pixels, but having a smaller resolution will degrade the accuracy rapidly.</p>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Overview</a></li>
+      <li>Next: <a href="pipeline.html" title="next chapter">WormPose pipeline</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/install.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

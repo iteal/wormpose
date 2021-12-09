@@ -1,0 +1,5 @@
+﻿wormpose.commands.predict_dataset
+=================================
+
+.. automodule:: wormpose.commands.predict_dataset
+    :members:

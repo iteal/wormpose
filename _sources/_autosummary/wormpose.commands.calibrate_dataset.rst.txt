@@ -1,0 +1,5 @@
+﻿wormpose.commands.calibrate_dataset
+===================================
+
+.. automodule:: wormpose.commands.calibrate_dataset
+    :members:

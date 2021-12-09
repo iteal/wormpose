@@ -1,0 +1,5 @@
+﻿wormpose.commands.utils.time_sampling
+=====================================
+
+.. automodule:: wormpose.commands.utils.time_sampling
+    :members:

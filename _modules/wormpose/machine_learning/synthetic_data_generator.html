@@ -1,0 +1,372 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.machine_learning.synthetic_data_generator &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.machine_learning.synthetic_data_generator</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Generates synthetic data using multiprocessing</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Process</span><span class="p">,</span> <span class="n">Value</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">wormpose.dataset</span> <span class="kn">import</span> <span class="n">Dataset</span>
+<span class="kn">from</span> <span class="nn">wormpose.machine_learning.generic_file_writer</span> <span class="kn">import</span> <span class="n">GenericFileWriter</span>
+<span class="kn">from</span> <span class="nn">wormpose.pose.centerline</span> <span class="kn">import</span> <span class="n">flip_theta</span>
+
+
+<span class="k">class</span> <span class="nc">_TemplatesChunkData</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_total_templates</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">measurements</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">skeletons</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">video_names</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_num_total</span> <span class="o">=</span> <span class="n">num_total_templates</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">_init_chunk_arr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arr</span><span class="p">):</span>
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_total</span><span class="p">,)</span> <span class="o">+</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">add_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">frames</span><span class="p">,</span> <span class="n">template_indexes</span><span class="p">,</span> <span class="n">video_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+
+        <span class="c1"># sort indexes for faster frames reading</span>
+        <span class="n">template_indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">template_indexes</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># init all chunk arrays</span>
+            <span class="c1"># frames images may not have all the same size, so preallocate a simple python list instead</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_total</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">skeletons</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_chunk_arr</span><span class="p">(</span><span class="n">features</span><span class="o">.</span><span class="n">skeletons</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">measurements</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_chunk_arr</span><span class="p">(</span><span class="n">features</span><span class="o">.</span><span class="n">measurements</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">video_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_chunk_arr</span><span class="p">(</span><span class="n">video_name</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">template_indexes</span><span class="p">)):</span>
+            <span class="n">template_index</span> <span class="o">=</span> <span class="n">template_indexes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">frames</span><span class="p">[</span><span class="n">template_index</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">skeletons</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">features</span><span class="o">.</span><span class="n">skeletons</span><span class="p">[</span><span class="n">template_index</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">measurements</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">features</span><span class="o">.</span><span class="n">measurements</span><span class="p">[</span><span class="n">template_index</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">video_names</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">video_name</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur_index</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="k">def</span> <span class="nf">write_to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_write_to_file</span><span class="p">(</span>
+    <span class="n">out_filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">template_filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">postures_generation_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">Generator</span><span class="p">],</span>
+    <span class="n">progress_counter</span><span class="p">,</span>
+    <span class="n">writer</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">GenericFileWriter</span><span class="p">],</span>
+    <span class="n">synthetic_dataset_args</span><span class="p">,</span>
+    <span class="n">random_seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+<span class="p">):</span>
+    <span class="kn">from</span> <span class="nn">wormpose.images.synthetic</span> <span class="kn">import</span> <span class="n">SyntheticDataset</span>
+
+    <span class="n">seed</span> <span class="o">=</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="mi">4</span><span class="p">),</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">random_seed</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">random_seed</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">template_filename</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">templates_f</span><span class="p">:</span>
+        <span class="n">templates</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">templates_f</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">template_filename</span><span class="p">)</span>
+
+    <span class="n">worm_measurements</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">video_name</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">templates</span><span class="o">.</span><span class="n">video_names</span><span class="p">):</span>
+        <span class="n">indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">templates</span><span class="o">.</span><span class="n">video_names</span> <span class="o">==</span> <span class="n">video_name</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">measurements</span> <span class="o">=</span> <span class="n">templates</span><span class="o">.</span><span class="n">measurements</span><span class="p">[</span><span class="n">indexes</span><span class="p">]</span>
+        <span class="n">average_measurements</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">measurements</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">measurements</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">measurements</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
+            <span class="n">average_measurements</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">measurements</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+        <span class="n">worm_measurements</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">average_measurements</span>
+
+    <span class="n">synthetic_dataset</span> <span class="o">=</span> <span class="n">SyntheticDataset</span><span class="p">(</span><span class="o">**</span><span class="n">synthetic_dataset_args</span><span class="p">)</span>
+
+    <span class="c1"># preallocate all the template indexes to create the synthetic images (random)</span>
+    <span class="n">template_indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">templates</span><span class="o">.</span><span class="n">frames</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="n">num_samples</span><span class="p">)</span>
+
+    <span class="c1"># preallocate all the choices for the position of the head (random)</span>
+    <span class="n">headtail_choice</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">num_samples</span><span class="p">)</span>
+
+    <span class="c1"># preallocate image buffer to draw the synthetic image on</span>
+    <span class="n">image_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">synthetic_dataset</span><span class="o">.</span><span class="n">output_image_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+
+    <span class="n">postures_gen</span> <span class="o">=</span> <span class="n">postures_generation_fn</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">writer</span><span class="p">(</span><span class="n">out_filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">synth_data_writer</span><span class="p">:</span>
+
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="p">(</span><span class="n">cur_template_index</span><span class="p">,</span> <span class="n">cur_headtail_choice</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">template_indexes</span><span class="p">,</span> <span class="n">headtail_choice</span><span class="p">)):</span>
+            <span class="n">theta</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">postures_gen</span><span class="p">)</span>
+            <span class="n">label_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">theta</span><span class="p">,</span> <span class="n">flip_theta</span><span class="p">(</span><span class="n">theta</span><span class="p">)]</span>
+            <span class="n">video_name</span> <span class="o">=</span> <span class="n">templates</span><span class="o">.</span><span class="n">video_names</span><span class="p">[</span><span class="n">cur_template_index</span><span class="p">]</span>
+            <span class="n">template_frame</span> <span class="o">=</span> <span class="n">templates</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="n">cur_template_index</span><span class="p">]</span>
+            <span class="n">template_skeleton</span> <span class="o">=</span> <span class="n">templates</span><span class="o">.</span><span class="n">skeletons</span><span class="p">[</span><span class="n">cur_template_index</span><span class="p">]</span>
+            <span class="n">template_measurements</span> <span class="o">=</span> <span class="n">worm_measurements</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span>
+            <span class="n">synthetic_dataset</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+                <span class="n">theta</span><span class="o">=</span><span class="n">label_data</span><span class="p">[</span><span class="n">cur_headtail_choice</span><span class="p">],</span>
+                <span class="n">template_frame</span><span class="o">=</span><span class="n">template_frame</span><span class="p">,</span>
+                <span class="n">template_skeleton</span><span class="o">=</span><span class="n">template_skeleton</span><span class="p">,</span>
+                <span class="n">template_measurements</span><span class="o">=</span><span class="n">template_measurements</span><span class="p">,</span>
+                <span class="n">out_image</span><span class="o">=</span><span class="n">image_data</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">synth_data_writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">locals</span><span class="p">())</span>
+            <span class="n">progress_counter</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">index</span> <span class="o">+</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="SyntheticDataGenerator"><a class="viewcode-back" href="../../../_autosummary/wormpose.machine_learning.synthetic_data_generator.html#wormpose.machine_learning.synthetic_data_generator.SyntheticDataGenerator">[docs]</a><span class="k">class</span> <span class="nc">SyntheticDataGenerator</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This generator makes synthetic data by distributing the work to several processes:</span>
+<span class="sd">    Each process will write one file containing the synthetic data and its label</span>
+<span class="sd">    We use a &quot;GenericFileWriter&quot; to be able to write the files in different formats (TFrecord, pickle etc...)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_MAX_TEMPLATE_FRAMES</span> <span class="o">=</span> <span class="mi">1000</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_process</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">temp_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="n">Dataset</span><span class="p">,</span>
+        <span class="n">postures_generation_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">Generator</span><span class="p">],</span>
+        <span class="n">enable_random_augmentations</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">writer</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">GenericFileWriter</span><span class="p">],</span>
+        <span class="n">random_seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        :param num_process: How many processes to distribute the work: there will be one file written per process</span>
+<span class="sd">        :param temp_dir: Where to store temporary files</span>
+<span class="sd">        :param dataset: A WormPose dataset</span>
+<span class="sd">        :param postures_generation_fn: A function generating worm postures (angles)</span>
+<span class="sd">        :param enable_random_augmentations: If true, the synthetic images will have random augmentations:</span>
+<span class="sd">            translation, scale, blur</span>
+<span class="sd">        :param writer: object responsible of writing the data to files</span>
+<span class="sd">        :param random_seed: Seed for reproducibility</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_process</span> <span class="o">=</span> <span class="n">num_process</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">temp_dir</span> <span class="o">=</span> <span class="n">temp_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postures_generation_fn</span> <span class="o">=</span> <span class="n">postures_generation_fn</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">writer</span> <span class="o">=</span> <span class="n">writer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">random_seed</span> <span class="o">=</span> <span class="n">random_seed</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">synthetic_dataset_args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">frame_preprocessing</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">frame_preprocessing</span><span class="p">,</span>
+            <span class="n">enable_random_augmentations</span><span class="o">=</span><span class="n">enable_random_augmentations</span><span class="p">,</span>
+            <span class="n">output_image_shape</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">image_shape</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">video_names</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">video_names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_all_template_indexes</span> <span class="o">=</span> <span class="p">[</span><span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">labelled_indexes</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_names</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_all_template_indexes</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Can&#39;t create training data because couldn&#39;t find any labelled frame in the dataset.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_split_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples_per_process</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Split a subset of template frames and associated features from different videos randomly to several processes</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">process_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_process</span><span class="p">):</span>
+
+            <span class="n">num_samples</span> <span class="o">=</span> <span class="n">num_samples_per_process</span><span class="p">[</span><span class="n">process_index</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">num_samples</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">num_templates</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_MAX_TEMPLATE_FRAMES</span><span class="p">)</span>
+
+            <span class="n">projected_num_templates_per_video</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">num_templates</span> <span class="o">//</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">video_names</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">actual_num_templates_per_video</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="nb">min</span><span class="p">(</span><span class="n">projected_num_templates_per_video</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_all_template_indexes</span>
+            <span class="p">]</span>
+            <span class="n">num_total_templates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">actual_num_templates_per_video</span><span class="p">)</span>
+            <span class="n">templates_chunk_data</span> <span class="o">=</span> <span class="n">_TemplatesChunkData</span><span class="p">(</span><span class="n">num_total_templates</span><span class="o">=</span><span class="n">num_total_templates</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">video_name</span><span class="p">,</span> <span class="n">cur_video_template_indexes</span><span class="p">,</span> <span class="n">cur_video_num_templates</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">video_names</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_all_template_indexes</span><span class="p">,</span>
+                <span class="n">actual_num_templates_per_video</span><span class="p">,</span>
+            <span class="p">):</span>
+                <span class="c1"># Select randomly some template indexes for each video</span>
+                <span class="n">template_indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+                    <span class="n">cur_video_template_indexes</span><span class="p">,</span>
+                    <span class="n">size</span><span class="o">=</span><span class="n">cur_video_num_templates</span><span class="p">,</span>
+                    <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="c1"># Fill in the templates data chunk for this video</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">frames_dataset</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">video_name</span><span class="p">)</span> <span class="k">as</span> <span class="n">frames</span><span class="p">:</span>
+                    <span class="n">templates_chunk_data</span><span class="o">.</span><span class="n">add_data</span><span class="p">(</span>
+                        <span class="n">features</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">video_name</span><span class="p">],</span>
+                        <span class="n">frames</span><span class="o">=</span><span class="n">frames</span><span class="p">,</span>
+                        <span class="n">template_indexes</span><span class="o">=</span><span class="n">template_indexes</span><span class="p">,</span>
+                        <span class="n">video_name</span><span class="o">=</span><span class="n">video_name</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+            <span class="n">template_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">temp_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;template_frames_</span><span class="si">{</span><span class="n">process_index</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">.pkl&quot;</span><span class="p">)</span>
+            <span class="n">templates_chunk_data</span><span class="o">.</span><span class="n">write_to_file</span><span class="p">(</span><span class="n">template_filename</span><span class="p">)</span>
+
+            <span class="k">yield</span> <span class="n">template_filename</span>
+
+<div class="viewcode-block" id="SyntheticDataGenerator.generate"><a class="viewcode-back" href="../../../_autosummary/wormpose.machine_learning.synthetic_data_generator.html#wormpose.machine_learning.synthetic_data_generator.SyntheticDataGenerator.generate">[docs]</a>    <span class="k">def</span> <span class="nf">generate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Start the generation of files containing synthetic data</span>
+
+<span class="sd">        :param file_pattern: Filepath of the files to generate with an &quot;index&quot; variable</span>
+<span class="sd">            ex: &quot;path_to/file_{index}.tfrecord&quot;</span>
+<span class="sd">        :param num_samples: How many images (total) to generate, they will be split in several files</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">num_samples</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">1</span>  <span class="c1"># nothing to do when num_samples is &lt;= 0, progress 100%</span>
+
+        <span class="n">progress_counters</span> <span class="o">=</span> <span class="p">[</span><span class="n">Value</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_process</span><span class="p">)]</span>
+
+        <span class="n">num_samples_per_process</span> <span class="o">=</span> <span class="p">[</span><span class="n">num_samples</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_process</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_process</span>
+        <span class="n">num_samples_per_process</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="n">num_samples</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_process</span>
+
+        <span class="n">workers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">process_index</span><span class="p">,</span> <span class="n">template_filename</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_split_data</span><span class="p">(</span><span class="n">num_samples_per_process</span><span class="p">)):</span>
+            <span class="n">seed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_seed</span> <span class="o">+</span> <span class="n">process_index</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">out_filename</span> <span class="o">=</span> <span class="n">file_pattern</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">process_index</span><span class="p">)</span>
+            <span class="n">proc</span> <span class="o">=</span> <span class="n">Process</span><span class="p">(</span>
+                <span class="n">target</span><span class="o">=</span><span class="n">_write_to_file</span><span class="p">,</span>
+                <span class="n">args</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">out_filename</span><span class="p">,</span>
+                    <span class="n">num_samples_per_process</span><span class="p">[</span><span class="n">process_index</span><span class="p">],</span>
+                    <span class="n">template_filename</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">postures_generation_fn</span><span class="p">,</span>
+                    <span class="n">progress_counters</span><span class="p">[</span><span class="n">process_index</span><span class="p">],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">writer</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">synthetic_dataset_args</span><span class="p">,</span>
+                    <span class="n">seed</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">proc</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+            <span class="n">workers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">proc</span><span class="p">)</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">num_entries_written</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">([</span><span class="n">x</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">progress_counters</span><span class="p">])</span>
+            <span class="k">yield</span> <span class="nb">float</span><span class="p">(</span><span class="n">num_entries_written</span><span class="p">)</span> <span class="o">/</span> <span class="n">num_samples</span>
+
+            <span class="k">if</span> <span class="n">num_entries_written</span> <span class="o">&gt;=</span> <span class="n">num_samples</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">proc</span> <span class="ow">in</span> <span class="n">workers</span><span class="p">:</span>
+            <span class="n">proc</span><span class="o">.</span><span class="n">join</span><span class="p">()</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

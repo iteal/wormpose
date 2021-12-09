@@ -1,0 +1,234 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.images.real_dataset &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.images.real_dataset</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Builds the real dataset, where images from a dataset are preprocessed and then cropped to be the same size</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">wormpose</span> <span class="kn">import</span> <span class="n">BaseFramePreprocessing</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.image_processing</span> <span class="kn">import</span> <span class="n">frame_preprocessor</span>
+
+
+<div class="viewcode-block" id="RealDataset"><a class="viewcode-back" href="../../../_autosummary/wormpose.images.real_dataset.html#wormpose.images.real_dataset.RealDataset">[docs]</a><span class="k">class</span> <span class="nc">RealDataset</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The RealDataset takes a raw image and apply the FramePreprocessing, it also ensures all the resulting images</span>
+<span class="sd">    have the same size, by expanding the region if necessary, or by simply cropping</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">frame_preprocessing</span><span class="p">:</span> <span class="n">BaseFramePreprocessing</span><span class="p">,</span>
+        <span class="n">output_image_shape</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        :param frame_preprocessing: the FramePreprocessing object containing the image preprocessing logic</span>
+<span class="sd">        :param output_image_shape: the desired output size of the images</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">output_image_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">output_image_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Image width and height should be even numbers: </span><span class="si">{</span><span class="n">output_image_shape</span><span class="si">}</span><span class="s2">, &quot;</span> <span class="sa">f</span><span class="s2">&quot;odd numbers not supported.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_image_shape</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="n">output_image_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">output_image_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frame_preprocessing</span> <span class="o">=</span> <span class="n">frame_preprocessing</span>
+
+<div class="viewcode-block" id="RealDataset.process_frame"><a class="viewcode-back" href="../../../_autosummary/wormpose.images.real_dataset.html#wormpose.images.real_dataset.RealDataset.process_frame">[docs]</a>    <span class="k">def</span> <span class="nf">process_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cur_frame</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Processes one image</span>
+
+<span class="sd">        :param cur_frame: Raw frame from a dataset to process</span>
+<span class="sd">        :return: Processed version of the frame and normalized to the desired image size</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">processed_frame</span><span class="p">,</span> <span class="n">bg_mean_color</span><span class="p">,</span> <span class="n">worm_roi</span> <span class="o">=</span> <span class="n">frame_preprocessor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_preprocessing</span><span class="p">,</span> <span class="n">cur_frame</span><span class="p">)</span>
+
+        <span class="n">center</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">worm_roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="o">+</span> <span class="n">worm_roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">worm_roi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="o">+</span> <span class="n">worm_roi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># simple case: just crop the desired shape centered around the region of interest</span>
+        <span class="k">if</span> <span class="n">_can_crop_simply</span><span class="p">(</span><span class="n">center</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_image_shape</span><span class="p">,</span> <span class="n">processed_frame</span><span class="p">):</span>
+            <span class="n">roi_coord</span><span class="p">,</span> <span class="n">skel_offset</span> <span class="o">=</span> <span class="n">_simple_crop</span><span class="p">(</span><span class="n">center</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_image_shape</span><span class="p">)</span>
+
+        <span class="c1"># if we can&#39;t make a simple crop :</span>
+        <span class="c1"># the region of interest of the worm is bigger than the result image or too much on the edge</span>
+        <span class="c1"># let&#39;s copy what fits to a new empty image</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">empty_frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_image_shape</span><span class="p">,</span> <span class="n">bg_mean_color</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">processed_frame</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="n">processed_frame</span><span class="p">,</span> <span class="n">roi_coord</span><span class="p">,</span> <span class="n">skel_offset</span> <span class="o">=</span> <span class="n">_complex_crop</span><span class="p">(</span>
+                <span class="n">empty_frame</span><span class="o">=</span><span class="n">empty_frame</span><span class="p">,</span>
+                <span class="n">center</span><span class="o">=</span><span class="n">center</span><span class="p">,</span>
+                <span class="n">out_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_image_shape</span><span class="p">,</span>
+                <span class="n">processed_frame</span><span class="o">=</span><span class="n">processed_frame</span><span class="p">,</span>
+                <span class="n">worm_roi</span><span class="o">=</span><span class="n">worm_roi</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">roi</span> <span class="o">=</span> <span class="n">processed_frame</span><span class="p">[</span><span class="n">roi_coord</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">roi</span><span class="p">,</span> <span class="n">skel_offset</span></div></div>
+
+
+<span class="k">def</span> <span class="nf">_can_crop_simply</span><span class="p">(</span><span class="n">center</span><span class="p">,</span> <span class="n">output_image_shape</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">processed_frame</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    We can make a simple crop if the output_image_shape with its center position set, fits in the processed_frame</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">center</span> <span class="o">-</span> <span class="n">output_image_shape</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="n">center</span> <span class="o">+</span> <span class="n">output_image_shape</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">&lt;</span> <span class="n">processed_frame</span><span class="o">.</span><span class="n">shape</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+
+
+<span class="k">def</span> <span class="nf">_simple_crop</span><span class="p">(</span><span class="n">center</span><span class="p">,</span> <span class="n">out_shape</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="n">top_left</span> <span class="o">=</span> <span class="p">(</span><span class="n">center</span> <span class="o">-</span> <span class="n">out_shape</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">bottom_right</span> <span class="o">=</span> <span class="p">(</span><span class="n">center</span> <span class="o">+</span> <span class="n">out_shape</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="n">roi_coord</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">s_</span><span class="p">[</span><span class="n">top_left</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">bottom_right</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">top_left</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="p">:</span> <span class="n">bottom_right</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+
+    <span class="c1"># skeleton is in XY coordinates (numpy is YX)</span>
+    <span class="n">skel_offset</span> <span class="o">=</span> <span class="p">(</span><span class="n">top_left</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">top_left</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">roi_coord</span><span class="p">,</span> <span class="n">skel_offset</span>
+
+
+<span class="k">def</span> <span class="nf">_complex_crop</span><span class="p">(</span><span class="n">empty_frame</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">out_shape</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">processed_frame</span><span class="p">,</span> <span class="n">worm_roi</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">slice</span><span class="p">,</span> <span class="nb">slice</span><span class="p">]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a new uniform image of the shape out_shape (pixels are set to bg_mean_color)</span>
+<span class="sd">    and set what fits of the processed frame in the center</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">out_height</span><span class="p">,</span> <span class="n">out_width</span> <span class="o">=</span> <span class="n">out_shape</span>
+
+    <span class="n">roi_height</span><span class="p">,</span> <span class="n">roi_width</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">worm_roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span> <span class="o">-</span> <span class="n">worm_roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">,</span>
+        <span class="n">worm_roi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span> <span class="o">-</span> <span class="n">worm_roi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">y</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="n">out_height</span> <span class="o">-</span> <span class="n">roi_height</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="n">out_width</span> <span class="o">-</span> <span class="n">roi_width</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">zone_to_copy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">s_</span><span class="p">[</span><span class="n">y</span> <span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="n">roi_height</span><span class="p">,</span> <span class="n">out_height</span><span class="p">),</span> <span class="n">x</span> <span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">roi_width</span><span class="p">,</span> <span class="n">out_width</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">roi_height</span> <span class="o">&gt;</span> <span class="n">out_height</span> <span class="ow">or</span> <span class="n">roi_width</span> <span class="o">&gt;</span> <span class="n">out_width</span><span class="p">:</span>
+        <span class="n">new_roi_height</span> <span class="o">=</span> <span class="n">zone_to_copy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span> <span class="o">-</span> <span class="n">zone_to_copy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span>
+        <span class="n">new_roi_width</span> <span class="o">=</span> <span class="n">zone_to_copy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span> <span class="o">-</span> <span class="n">zone_to_copy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span>
+        <span class="n">y</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">center</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">new_roi_height</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">center</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">new_roi_width</span> <span class="o">//</span> <span class="mi">2</span>
+        <span class="n">worm_roi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">s_</span><span class="p">[</span><span class="n">y</span> <span class="p">:</span> <span class="n">y</span> <span class="o">+</span> <span class="n">new_roi_height</span><span class="p">,</span> <span class="n">x</span> <span class="p">:</span> <span class="n">x</span> <span class="o">+</span> <span class="n">new_roi_width</span><span class="p">]</span>
+
+    <span class="n">empty_frame</span><span class="p">[</span><span class="n">zone_to_copy</span><span class="p">]</span> <span class="o">=</span> <span class="n">processed_frame</span><span class="p">[</span><span class="n">worm_roi</span><span class="p">]</span>
+    <span class="n">roi_coord</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">s_</span><span class="p">[:</span><span class="n">out_height</span><span class="p">,</span> <span class="p">:</span><span class="n">out_width</span><span class="p">]</span>
+    <span class="n">skel_offset</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">worm_roi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="o">-</span> <span class="n">zone_to_copy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">,</span>
+        <span class="n">worm_roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="o">-</span> <span class="n">zone_to_copy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">empty_frame</span><span class="p">,</span> <span class="n">roi_coord</span><span class="p">,</span> <span class="n">skel_offset</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.images.scoring.centerline_accuracy_check &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/alabaster.css" />
+    <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
+    <script src="../../../../_static/jquery.js"></script>
+    <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.images.scoring.centerline_accuracy_check</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Assesses the accuracy of a centerline theta compared to a real image, by calculating the image similarity metric</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">wormpose</span> <span class="kn">import</span> <span class="n">BaseFramePreprocessing</span>
+<span class="kn">from</span> <span class="nn">wormpose.images.scoring</span> <span class="kn">import</span> <span class="n">image_scoring</span>
+<span class="kn">from</span> <span class="nn">wormpose.images.scoring.image_scoring</span> <span class="kn">import</span> <span class="n">fit_bounding_box_to_worm</span>
+<span class="kn">from</span> <span class="nn">wormpose.images.real_dataset</span> <span class="kn">import</span> <span class="n">RealDataset</span>
+<span class="kn">from</span> <span class="nn">wormpose.images.synthetic</span> <span class="kn">import</span> <span class="n">SyntheticDataset</span>
+
+
+<div class="viewcode-block" id="CenterlineAccuracyCheck"><a class="viewcode-back" href="../../../../_autosummary/wormpose.images.scoring.centerline_accuracy_check.html#wormpose.images.scoring.centerline_accuracy_check.CenterlineAccuracyCheck">[docs]</a><span class="k">class</span> <span class="nc">CenterlineAccuracyCheck</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class that performs comparison (image similarity) to assess how a centerline accurately represents a real image.</span>
+
+<span class="sd">    It first preprocesses the original real image with a BaseFramePreprocessing class</span>
+<span class="sd">    (crop and set the background pixels to a uniform color).</span>
+<span class="sd">    Then, it creates a synthetic image representing the centerline theta, using a provided template image.</span>
+<span class="sd">    Typically, the template image was chosen to be the closest labelled image in time to the real image.</span>
+<span class="sd">    The synthetic image is cropped to fit the worm, in order to apply a template matching function between</span>
+<span class="sd">    the real image (full size) and the synthetic image (smaller)</span>
+<span class="sd">    The result is an image similarity value and the synthetic image skeleton coordinates.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame_preprocessing</span><span class="p">:</span> <span class="n">BaseFramePreprocessing</span><span class="p">,</span> <span class="n">image_shape</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">real_dataset</span> <span class="o">=</span> <span class="n">RealDataset</span><span class="p">(</span><span class="n">frame_preprocessing</span><span class="o">=</span><span class="n">frame_preprocessing</span><span class="p">,</span> <span class="n">output_image_shape</span><span class="o">=</span><span class="n">image_shape</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">synthetic_dataset</span> <span class="o">=</span> <span class="n">SyntheticDataset</span><span class="p">(</span>
+            <span class="n">frame_preprocessing</span><span class="o">=</span><span class="n">frame_preprocessing</span><span class="p">,</span>
+            <span class="n">output_image_shape</span><span class="o">=</span><span class="n">image_shape</span><span class="p">,</span>
+            <span class="n">enable_random_augmentations</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_synth_image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">image_shape</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_real_image</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">theta</span><span class="p">,</span>
+        <span class="n">template_skeleton</span><span class="p">,</span>
+        <span class="n">template_frame</span><span class="p">,</span>
+        <span class="n">template_measurements</span><span class="p">,</span>
+        <span class="n">real_frame_orig</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">theta</span><span class="p">)):</span>
+            <span class="n">score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+            <span class="n">synth_skel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">template_skeleton</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">score</span><span class="p">,</span> <span class="n">synth_skel</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_real_image</span><span class="p">,</span> <span class="n">skel_offset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">real_dataset</span><span class="o">.</span><span class="n">process_frame</span><span class="p">(</span><span class="n">real_frame_orig</span><span class="p">)</span>
+        <span class="n">cur_bg_color</span><span class="p">,</span> <span class="n">synth_skel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synthetic_dataset</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+            <span class="n">theta</span><span class="p">,</span>
+            <span class="n">template_frame</span><span class="o">=</span><span class="n">template_frame</span><span class="p">,</span>
+            <span class="n">template_skeleton</span><span class="o">=</span><span class="n">template_skeleton</span><span class="p">,</span>
+            <span class="n">out_image</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">last_synth_image</span><span class="p">,</span>
+            <span class="n">template_measurements</span><span class="o">=</span><span class="n">template_measurements</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Crop the synthetic image to the object of interest before doing the image comparison,</span>
+        <span class="c1"># we don&#39;t need the full image with all the background, still keep a little padding around the worm.</span>
+        <span class="n">bounding_box</span> <span class="o">=</span> <span class="n">fit_bounding_box_to_worm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">last_synth_image</span><span class="p">,</span> <span class="n">cur_bg_color</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">subtract</span><span class="p">(</span><span class="n">synth_skel</span><span class="p">,</span> <span class="p">(</span><span class="n">bounding_box</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">bounding_box</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">),</span> <span class="n">out</span><span class="o">=</span><span class="n">synth_skel</span><span class="p">)</span>
+        <span class="n">cropped_synth_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_synth_image</span><span class="p">[</span><span class="n">bounding_box</span><span class="p">]</span>
+
+        <span class="c1"># Perform the image comparison between the real image and the reconstructed synthetic image cropped.</span>
+        <span class="c1"># This gives a heat map, we are interested in the maximum value of the heatmap and its location.</span>
+        <span class="c1"># This maximum score gives an estimation of the confidence of the prediction.</span>
+        <span class="n">score</span><span class="p">,</span> <span class="n">score_loc</span> <span class="o">=</span> <span class="n">image_scoring</span><span class="o">.</span><span class="n">calculate_similarity</span><span class="p">(</span>
+            <span class="n">source_image</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">last_real_image</span><span class="p">,</span> <span class="n">template_image</span><span class="o">=</span><span class="n">cropped_synth_image</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Using the heatmap maximum coordinates, we can transform the coordinates of the reconstructed skeleton</span>
+        <span class="c1"># to the original image coordinates system.</span>
+        <span class="n">synth_skel</span> <span class="o">+=</span> <span class="n">score_loc</span>
+        <span class="n">synth_skel</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">skel_offset</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">skel_offset</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
+
+        <span class="k">return</span> <span class="n">score</span><span class="p">,</span> <span class="n">synth_skel</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

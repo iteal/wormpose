@@ -1,0 +1,90 @@
+.. figure:: https://i.imgur.com/hcOUEif.png
+   :alt: 
+
+|PyPI status| |PyPI version| |Build Status| |PyPI pyversions|
+|Maintainability| |Code style: black|
+
+|image6| |image7| |image8|
+
+Results videos adapted from `Open Worm Movement
+Database <http://movement.openworm.org/>`__ license `CC
+4.0 <https://creativecommons.org/licenses/by/4.0/legalcode>`__
+
+Overview
+--------
+
+The WormPose package estimates the challenging poses of C. elegans in
+videos including coils and overlaps.
+
+We train a convolutional neural network with synthetic worm images so
+that there is no need for human annotated labels.
+
+Get started quickly
+-------------------
+
+`Try the tutorial
+notebook <https://github.com/iteal/wormpose/blob/main/examples/tutorial_sample_data.ipynb>`__
+
+This notebook goes over the whole WormPose pipeline with some sample
+data and an already trained model. You can run it in Google Colab.
+
+Read the documentation
+----------------------
+
+Check the `Documentation
+website <https://iteal.github.io/wormpose/index.html>`__ for detailed
+instructions.
+
+Read the paper
+--------------
+
+| `WormPose: Image synthesis and convolutional networks for pose
+  estimation in C.
+  elegans <https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1008914>`__
+| Hebert L, Ahamed T, Costa AC, O’Shaughnessy L, Stephens GJ (2021)
+  WormPose: Image synthesis and convolutional networks for pose
+  estimation in C. elegans. PLOS Computational Biology 17(4): e1008914.
+  https://doi.org/10.1371/journal.pcbi.1008914
+
+Manuscript data
+---------------
+
+Manuscript data is available here: https://wormpose.unit.oist.jp.
+
+.. |PyPI status| image:: https://img.shields.io/pypi/status/wormpose.svg
+   :target: https://pypi.python.org/pypi/wormpose/
+.. |PyPI version| image:: https://badge.fury.io/py/wormpose.svg
+   :target: https://pypi.python.org/pypi/wormpose/
+.. |Build Status| image:: https://travis-ci.com/iteal/wormpose.svg?branch=main
+   :target: https://travis-ci.com/iteal/wormpose
+.. |PyPI pyversions| image:: https://img.shields.io/pypi/pyversions/wormpose.svg
+   :target: https://pypi.python.org/pypi/wormpose/
+.. |Maintainability| image:: https://img.shields.io/codeclimate/maintainability/iteal/wormpose
+   :target: https://codeclimate.com/github/iteal/wormpose/maintainability
+.. |Code style: black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
+   :target: https://github.com/psf/black
+.. |image6| image:: https://i.imgur.com/l76dxbM.gif
+.. |image7| image:: https://i.imgur.com/4b8zz68.gif
+.. |image8| image:: https://i.imgur.com/e4oox2p.gif
+
+Contents
+--------
+
+.. toctree::
+    :maxdepth: 2
+
+    Installation <install>
+    WormPose pipeline <pipeline>
+    Use with Tierpsy <tierpsy>
+    Load custom data <custom_loader>
+    Documentation <documentation>
+
+
+.. _Indices_and_Tables:
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

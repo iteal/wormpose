@@ -1,0 +1,5 @@
+﻿wormpose.dataset.image_processing.simple_frame_preprocessing
+============================================================
+
+.. automodule:: wormpose.dataset.image_processing.simple_frame_preprocessing
+    :members:

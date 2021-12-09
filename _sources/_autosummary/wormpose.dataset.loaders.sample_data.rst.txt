@@ -1,0 +1,5 @@
+﻿wormpose.dataset.loaders.sample_data
+====================================
+
+.. automodule:: wormpose.dataset.loaders.sample_data
+    :members:

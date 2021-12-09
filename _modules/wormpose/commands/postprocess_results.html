@@ -1,0 +1,462 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.commands.postprocess_results &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.commands.postprocess_results</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Post-processes WormPose results by interpolating over missing frames and smoothing</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">from</span> <span class="nn">argparse</span> <span class="kn">import</span> <span class="n">Namespace</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Sequence</span>
+
+<span class="kn">import</span> <span class="nn">h5py</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">numpy.ma</span> <span class="k">as</span> <span class="nn">ma</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="kn">import</span> <span class="n">interp1d</span>
+<span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="kn">import</span> <span class="n">savgol_filter</span>
+
+<span class="kn">from</span> <span class="nn">wormpose.commands</span> <span class="kn">import</span> <span class="n">_log_parameters</span>
+<span class="kn">from</span> <span class="nn">wormpose.commands.utils.results_saver</span> <span class="kn">import</span> <span class="n">ResultsSaver</span>
+<span class="kn">from</span> <span class="nn">wormpose.commands.utils.time_sampling</span> <span class="kn">import</span> <span class="n">resample_results</span>
+<span class="kn">from</span> <span class="nn">wormpose.config</span> <span class="kn">import</span> <span class="n">default_paths</span>
+<span class="kn">from</span> <span class="nn">wormpose.config.default_paths</span> <span class="kn">import</span> <span class="n">RESULTS_FILENAME</span><span class="p">,</span> <span class="n">POSTPROCESSED_RESULTS_FILENAME</span><span class="p">,</span> <span class="n">CONFIG_FILENAME</span>
+<span class="kn">from</span> <span class="nn">wormpose.config.experiment_config</span> <span class="kn">import</span> <span class="n">load_config</span><span class="p">,</span> <span class="n">add_config_argument</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.loader</span> <span class="kn">import</span> <span class="n">get_dataset_name</span><span class="p">,</span> <span class="n">Dataset</span>
+<span class="kn">from</span> <span class="nn">wormpose.dataset.loader</span> <span class="kn">import</span> <span class="n">load_dataset</span>
+<span class="kn">from</span> <span class="nn">wormpose.images.scoring</span> <span class="kn">import</span> <span class="n">ResultsScoring</span><span class="p">,</span> <span class="n">ScoringDataManager</span>
+<span class="kn">from</span> <span class="nn">wormpose.pose.eigenworms</span> <span class="kn">import</span> <span class="n">load_eigenworms_matrix</span>
+<span class="kn">from</span> <span class="nn">wormpose.pose.results_datatypes</span> <span class="kn">import</span> <span class="n">BaseResults</span><span class="p">,</span> <span class="n">OriginalResults</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">()</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_find_runs_boundaries</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :return: list of pair of indexes [start, end] of the segments (runs of consecutive True values) boundaries</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">padded_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([[</span><span class="kc">False</span><span class="p">],</span> <span class="n">arr</span><span class="p">,</span> <span class="p">[</span><span class="kc">False</span><span class="p">]])</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">padded_arr</span><span class="p">)))[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_valid_segments</span><span class="p">(</span><span class="n">is_valid_series</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">max_gap_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">min_segment_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sequence</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :return: list of pair of indexes [start, end] of the valid segments in the data:</span>
+<span class="sd">        They can contain small gaps &lt;= max_gap_size but they need to be surrounded by valid data</span>
+<span class="sd">        of length &gt;= min_segment_size</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># identify segments (consecutive runs of valid frames)</span>
+    <span class="n">segments_boundaries</span> <span class="o">=</span> <span class="n">_find_runs_boundaries</span><span class="p">(</span><span class="n">is_valid_series</span><span class="p">)</span>
+
+    <span class="c1"># find the big segments of length greater or equal than min_segment_size</span>
+    <span class="n">big_segments_boundaries</span> <span class="o">=</span> <span class="p">[[</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">]</span> <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">segments_boundaries</span> <span class="k">if</span> <span class="n">end</span> <span class="o">-</span> <span class="n">start</span> <span class="o">&gt;=</span> <span class="n">min_segment_size</span><span class="p">]</span>
+    <span class="n">big_segments</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">is_valid_series</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">gap_start</span><span class="p">,</span> <span class="n">gap_end</span> <span class="ow">in</span> <span class="n">big_segments_boundaries</span><span class="p">:</span>
+        <span class="n">big_segments</span><span class="p">[</span><span class="n">gap_start</span><span class="p">:</span><span class="n">gap_end</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="c1"># identify gaps (consecutive runs of invalid frames between the big segments)</span>
+    <span class="n">gaps_boundaries</span> <span class="o">=</span> <span class="n">_find_runs_boundaries</span><span class="p">(</span><span class="o">~</span><span class="n">big_segments</span><span class="p">)</span>
+
+    <span class="c1"># only keep the big gaps of length greater than max_gap_size</span>
+    <span class="n">big_gaps_boundaries</span> <span class="o">=</span> <span class="p">[[</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">]</span> <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">gaps_boundaries</span> <span class="k">if</span> <span class="n">end</span> <span class="o">-</span> <span class="n">start</span> <span class="o">&gt;</span> <span class="n">max_gap_size</span><span class="p">]</span>
+    <span class="n">big_gaps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">is_valid_series</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">gap_start</span><span class="p">,</span> <span class="n">gap_end</span> <span class="ow">in</span> <span class="n">big_gaps_boundaries</span><span class="p">:</span>
+        <span class="n">big_gaps</span><span class="p">[</span><span class="n">gap_start</span><span class="p">:</span><span class="n">gap_end</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="c1"># the final valid segments are in-between the big gaps</span>
+    <span class="c1"># they can contain small gaps but there are at least min_segment_size before and after the small gaps</span>
+    <span class="n">valid_segments_boundaries</span> <span class="o">=</span> <span class="n">_find_runs_boundaries</span><span class="p">(</span><span class="o">~</span><span class="n">big_gaps</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">valid_segments_boundaries</span>
+
+
+<span class="k">class</span> <span class="nc">_SplineInterpolation</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">interpolate_tseries</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tseries</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">segments_boundaries</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+
+        <span class="n">tseries</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">tseries</span><span class="p">)]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unwrap</span><span class="p">(</span><span class="n">tseries</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">tseries</span><span class="p">)])</span>
+        <span class="n">new_tseries</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">tseries</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">t0</span><span class="p">,</span> <span class="n">tf</span> <span class="ow">in</span> <span class="n">segments_boundaries</span><span class="p">:</span>
+            <span class="n">new_tseries</span><span class="p">[</span><span class="n">t0</span><span class="p">:</span><span class="n">tf</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interpolate_segment</span><span class="p">(</span><span class="n">tseries</span><span class="p">[</span><span class="n">t0</span><span class="p">:</span><span class="n">tf</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">new_tseries</span>
+
+    <span class="k">def</span> <span class="nf">_interpolate_segment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tseries</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="n">new_tseries</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">tseries</span><span class="p">)</span>
+
+        <span class="c1"># perform spline interpolation separately for each dimension</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">new_tseries</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">y0</span> <span class="o">=</span> <span class="n">new_tseries</span><span class="p">[:,</span> <span class="n">dim</span><span class="p">]</span>
+            <span class="n">xn</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">new_tseries</span><span class="p">))</span>
+            <span class="n">sel</span> <span class="o">=</span> <span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y0</span><span class="p">)</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">xn</span><span class="p">[</span><span class="n">sel</span><span class="p">]</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">y0</span><span class="p">[</span><span class="n">sel</span><span class="p">]</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;cubic&quot;</span><span class="p">)</span>
+            <span class="n">yn</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">xn</span><span class="p">)</span>
+            <span class="n">new_tseries</span><span class="p">[:,</span> <span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">yn</span>
+
+        <span class="k">return</span> <span class="n">new_tseries</span>
+
+
+<span class="k">def</span> <span class="nf">_smooth_tseries</span><span class="p">(</span>
+    <span class="n">tseries</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">smoothing_window_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">poly_order</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">segments_boundaries</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">smoothing_window_length</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">smoothing_window_length</span> <span class="o">+=</span> <span class="mi">1</span>  <span class="c1"># need a odd number for smoothing_window_length</span>
+
+    <span class="n">new_tseries</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">tseries</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">t0</span><span class="p">,</span> <span class="n">tf</span> <span class="ow">in</span> <span class="n">segments_boundaries</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">tf</span> <span class="o">-</span> <span class="n">t0</span> <span class="o">&lt;</span> <span class="n">smoothing_window_length</span> <span class="ow">or</span> <span class="n">tf</span> <span class="o">-</span> <span class="n">t0</span> <span class="o">&lt;</span> <span class="n">poly_order</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">new_tseries</span><span class="p">[</span><span class="n">t0</span><span class="p">:</span><span class="n">tf</span><span class="p">]</span> <span class="o">=</span> <span class="n">savgol_filter</span><span class="p">(</span>
+            <span class="n">tseries</span><span class="p">[</span><span class="n">t0</span><span class="p">:</span><span class="n">tf</span><span class="p">],</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+            <span class="n">window_length</span><span class="o">=</span><span class="n">smoothing_window_length</span><span class="p">,</span>
+            <span class="n">polyorder</span><span class="o">=</span><span class="n">poly_order</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">new_tseries</span>
+
+
+<span class="k">def</span> <span class="nf">_dorsal_ventral_flip_theta</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">return</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">-</span> <span class="n">theta</span>
+
+
+<span class="k">def</span> <span class="nf">_thetas_to_modes</span><span class="p">(</span><span class="n">thetas</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">eigenworms_matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">thetas</span><span class="o">.</span><span class="n">T</span> <span class="o">-</span> <span class="n">thetas</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">eigenworms_matrix</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_unwrap_ma</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ma</span><span class="o">.</span><span class="n">MaskedArray</span><span class="p">):</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">ma</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">mask</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">mask</span><span class="p">)</span>
+    <span class="n">idxc</span> <span class="o">=</span> <span class="n">idx</span><span class="o">.</span><span class="n">compressed</span><span class="p">()</span>
+    <span class="n">xc</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">compressed</span><span class="p">()</span>
+    <span class="n">dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">xc</span><span class="p">)</span>
+    <span class="n">ddmod</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mod</span><span class="p">(</span><span class="n">dd</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+    <span class="n">ddmod</span><span class="p">[(</span><span class="n">ddmod</span> <span class="o">==</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">dd</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+    <span class="n">phc_correct</span> <span class="o">=</span> <span class="n">ddmod</span> <span class="o">-</span> <span class="n">dd</span>
+    <span class="n">phc_correct</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">dd</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">ph_correct</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">ph_correct</span><span class="p">[</span><span class="n">idxc</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]</span> <span class="o">=</span> <span class="n">phc_correct</span>
+    <span class="n">up</span> <span class="o">=</span> <span class="n">x</span> <span class="o">+</span> <span class="n">ph_correct</span><span class="o">.</span><span class="n">cumsum</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">up</span>
+
+
+<span class="k">def</span> <span class="nf">_calculate_skeleton</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">Dataset</span><span class="p">,</span> <span class="n">video_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseResults</span><span class="p">:</span>
+    <span class="n">frames_timestamp</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span><span class="o">.</span><span class="n">timestamp</span>
+    <span class="n">features</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span>
+
+    <span class="c1"># resample time serie to have the same length as the number of frames</span>
+    <span class="n">theta_resampled</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">dataset</span><span class="o">.</span><span class="n">num_frames</span><span class="p">(</span><span class="n">video_name</span><span class="p">),)</span> <span class="o">+</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">theta</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">cur_time</span><span class="p">,</span> <span class="n">cur_theta</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+        <span class="n">frame_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">frames_timestamp</span> <span class="o">==</span> <span class="n">cur_time</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">theta_resampled</span><span class="p">[</span><span class="n">frame_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">cur_theta</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="n">BaseResults</span><span class="p">(</span><span class="n">theta</span><span class="o">=</span><span class="n">theta_resampled</span><span class="p">)</span>
+    <span class="n">ResultsScoring</span><span class="p">(</span>
+        <span class="n">frame_preprocessing</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">frame_preprocessing</span><span class="p">,</span>
+        <span class="n">num_process</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">num_process</span><span class="p">,</span>
+        <span class="n">temp_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">temp_dir</span><span class="p">,</span>
+        <span class="n">image_shape</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">image_shape</span><span class="p">,</span>
+    <span class="p">)(</span>
+        <span class="n">results</span><span class="o">=</span><span class="n">results</span><span class="p">,</span>
+        <span class="n">scoring_data_manager</span><span class="o">=</span><span class="n">ScoringDataManager</span><span class="p">(</span>
+            <span class="n">video_name</span><span class="o">=</span><span class="n">video_name</span><span class="p">,</span>
+            <span class="n">frames_dataset</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">frames_dataset</span><span class="p">,</span>
+            <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">resample_results</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">features</span><span class="o">.</span><span class="n">timestamp</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span>
+
+
+<span class="k">def</span> <span class="nf">_parse_arguments</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;work_dir&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;work_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">default_paths</span><span class="o">.</span><span class="n">WORK_DIR</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_gap_size&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_gap_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_segment_size&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_segment_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;smoothing_window&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;smoothing_window&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;poly_order&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;poly_order&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;eigenworms_matrix_path&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;eigenworms_matrix_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_process&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;num_process&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">()</span>
+    <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;temp_dir&quot;</span><span class="p">])</span>
+
+    <span class="n">dataset_name</span> <span class="o">=</span> <span class="n">get_dataset_name</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">)</span>
+    <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;experiment_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;work_dir&quot;</span><span class="p">],</span> <span class="n">dataset_name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;config&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;experiment_dir&quot;</span><span class="p">],</span> <span class="n">CONFIG_FILENAME</span><span class="p">)</span>
+
+    <span class="n">_log_parameters</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;dataset_path&quot;</span><span class="p">:</span> <span class="n">dataset_path</span><span class="p">})</span>
+    <span class="n">_log_parameters</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">Namespace</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="post_process"><a class="viewcode-back" href="../../../_autosummary/wormpose.commands.postprocess_results.html#wormpose.commands.postprocess_results.post_process">[docs]</a><span class="k">def</span> <span class="nf">post_process</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Process the raw network results with interpolation and smoothing</span>
+
+<span class="sd">    :param dataset_path: Root path of the dataset containing videos of worm</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">_parse_arguments</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">results_root_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">experiment_dir</span><span class="p">,</span> <span class="n">default_paths</span><span class="o">.</span><span class="n">RESULTS_DIR</span><span class="p">)</span>
+
+    <span class="n">eigenworms_matrix</span> <span class="o">=</span> <span class="n">load_eigenworms_matrix</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">eigenworms_matrix_path</span><span class="p">)</span>
+
+    <span class="n">config</span> <span class="o">=</span> <span class="n">load_config</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">dataset_loader</span><span class="p">,</span> <span class="n">dataset_path</span><span class="p">)</span>
+
+    <span class="n">spline_interpolation</span> <span class="o">=</span> <span class="n">_SplineInterpolation</span><span class="p">()</span>
+
+    <span class="n">results_files</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">results_root_dir</span><span class="p">,</span> <span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">RESULTS_FILENAME</span><span class="p">))))</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">results_files</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="s2">&quot;No results file to analyze was found&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">results_file</span> <span class="ow">in</span> <span class="n">results_files</span><span class="p">:</span>
+        <span class="n">video_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">results_file</span><span class="p">))</span>
+
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">results_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">results_f</span><span class="p">:</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">results_raw</span> <span class="o">=</span> <span class="n">BaseResults</span><span class="p">(</span>
+                    <span class="n">theta</span><span class="o">=</span><span class="n">results_f</span><span class="p">[</span><span class="s2">&quot;resolved&quot;</span><span class="p">][</span><span class="s2">&quot;theta&quot;</span><span class="p">][:],</span>
+                    <span class="n">skeletons</span><span class="o">=</span><span class="n">results_f</span><span class="p">[</span><span class="s2">&quot;resolved&quot;</span><span class="p">][</span><span class="s2">&quot;skeletons&quot;</span><span class="p">][:],</span>
+                    <span class="n">scores</span><span class="o">=</span><span class="n">results_f</span><span class="p">[</span><span class="s2">&quot;resolved&quot;</span><span class="p">][</span><span class="s2">&quot;scores&quot;</span><span class="p">][:],</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Couldn&#39;t read results in file </span><span class="si">{</span><span class="n">results_file</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">results_orig</span> <span class="o">=</span> <span class="n">OriginalResults</span><span class="p">(</span>
+                <span class="n">theta</span><span class="o">=</span><span class="n">results_f</span><span class="p">[</span><span class="s2">&quot;original&quot;</span><span class="p">][</span><span class="s2">&quot;theta&quot;</span><span class="p">][:],</span> <span class="n">skeletons</span><span class="o">=</span><span class="n">results_f</span><span class="p">[</span><span class="s2">&quot;original&quot;</span><span class="p">][</span><span class="s2">&quot;skeletons&quot;</span><span class="p">][:]</span>
+            <span class="p">)</span>
+
+            <span class="n">features</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span>
+
+            <span class="n">missing_values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">results_raw</span><span class="o">.</span><span class="n">theta</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">missing_values</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">results_raw</span><span class="o">.</span><span class="n">theta</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No valid result was found, stopping postprocessing for </span><span class="si">{</span><span class="n">video_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">segments_boundaries</span> <span class="o">=</span> <span class="n">_get_valid_segments</span><span class="p">(</span>
+                <span class="n">is_valid_series</span><span class="o">=~</span><span class="n">missing_values</span><span class="p">,</span>
+                <span class="n">max_gap_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">max_gap_size</span><span class="p">,</span>
+                <span class="n">min_segment_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">min_segment_size</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># interpolate and smooth in angles space</span>
+            <span class="n">thetas_interp</span> <span class="o">=</span> <span class="n">spline_interpolation</span><span class="o">.</span><span class="n">interpolate_tseries</span><span class="p">(</span><span class="n">results_raw</span><span class="o">.</span><span class="n">theta</span><span class="p">,</span> <span class="n">segments_boundaries</span><span class="p">)</span>
+            <span class="n">results_interp</span> <span class="o">=</span> <span class="n">_calculate_skeleton</span><span class="p">(</span><span class="n">thetas_interp</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">video_name</span><span class="p">)</span>
+
+            <span class="n">thetas_smooth</span> <span class="o">=</span> <span class="n">_smooth_tseries</span><span class="p">(</span>
+                <span class="n">thetas_interp</span><span class="p">,</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">smoothing_window</span><span class="p">,</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span>
+                <span class="n">segments_boundaries</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">results_smooth</span> <span class="o">=</span> <span class="n">_calculate_skeleton</span><span class="p">(</span><span class="n">thetas_smooth</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">video_name</span><span class="p">)</span>
+
+            <span class="n">flipped</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="n">features</span><span class="o">.</span><span class="n">ventral_side</span> <span class="o">==</span> <span class="s2">&quot;clockwise&quot;</span><span class="p">:</span>
+                <span class="n">results_orig</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">_dorsal_ventral_flip_theta</span><span class="p">(</span><span class="n">results_orig</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
+                <span class="n">results_raw</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">_dorsal_ventral_flip_theta</span><span class="p">(</span><span class="n">results_raw</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
+                <span class="n">results_interp</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">_dorsal_ventral_flip_theta</span><span class="p">(</span><span class="n">results_interp</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
+                <span class="n">results_smooth</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">_dorsal_ventral_flip_theta</span><span class="p">(</span><span class="n">results_smooth</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
+                <span class="n">flipped</span> <span class="o">=</span> <span class="kc">True</span>
+
+            <span class="k">if</span> <span class="n">eigenworms_matrix</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">results_orig</span><span class="p">,</span> <span class="s2">&quot;modes&quot;</span><span class="p">,</span> <span class="n">_thetas_to_modes</span><span class="p">(</span><span class="n">results_orig</span><span class="o">.</span><span class="n">theta</span><span class="p">,</span> <span class="n">eigenworms_matrix</span><span class="p">))</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">results_raw</span><span class="p">,</span> <span class="s2">&quot;modes&quot;</span><span class="p">,</span> <span class="n">_thetas_to_modes</span><span class="p">(</span><span class="n">results_raw</span><span class="o">.</span><span class="n">theta</span><span class="p">,</span> <span class="n">eigenworms_matrix</span><span class="p">))</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">results_interp</span><span class="p">,</span> <span class="s2">&quot;modes&quot;</span><span class="p">,</span> <span class="n">_thetas_to_modes</span><span class="p">(</span><span class="n">results_interp</span><span class="o">.</span><span class="n">theta</span><span class="p">,</span> <span class="n">eigenworms_matrix</span><span class="p">))</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">results_smooth</span><span class="p">,</span> <span class="s2">&quot;modes&quot;</span><span class="p">,</span> <span class="n">_thetas_to_modes</span><span class="p">(</span><span class="n">results_smooth</span><span class="o">.</span><span class="n">theta</span><span class="p">,</span> <span class="n">eigenworms_matrix</span><span class="p">))</span>
+
+        <span class="n">frame_rate</span> <span class="o">=</span> <span class="n">features</span><span class="o">.</span><span class="n">frame_rate</span>
+
+        <span class="c1"># save results</span>
+        <span class="n">results_saver</span> <span class="o">=</span> <span class="n">ResultsSaver</span><span class="p">(</span>
+            <span class="n">temp_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">temp_dir</span><span class="p">,</span> <span class="n">results_root_dir</span><span class="o">=</span><span class="n">results_root_dir</span><span class="p">,</span> <span class="n">results_filename</span><span class="o">=</span><span class="n">POSTPROCESSED_RESULTS_FILENAME</span>
+        <span class="p">)</span>
+
+        <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;max_gap_size&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">max_gap_size</span><span class="p">,</span>
+            <span class="s2">&quot;min_segment_size&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">min_segment_size</span><span class="p">,</span>
+            <span class="s2">&quot;smoothing_window&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">smoothing_window</span><span class="p">,</span>
+            <span class="s2">&quot;poly_order&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span>
+            <span class="s2">&quot;dorsal_ventral_flip&quot;</span><span class="p">:</span> <span class="n">flipped</span><span class="p">,</span>
+            <span class="s2">&quot;frame_rate&quot;</span><span class="p">:</span> <span class="n">frame_rate</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="n">results_saver</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+            <span class="n">results</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;orig&quot;</span><span class="p">:</span> <span class="n">results_orig</span><span class="p">,</span> <span class="s2">&quot;raw&quot;</span><span class="p">:</span> <span class="n">results_raw</span><span class="p">,</span> <span class="s2">&quot;interp&quot;</span><span class="p">:</span> <span class="n">results_interp</span><span class="p">,</span> <span class="s2">&quot;smooth&quot;</span><span class="p">:</span> <span class="n">results_smooth</span><span class="p">},</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+            <span class="n">video_name</span><span class="o">=</span><span class="n">video_name</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Post-processed worm: </span><span class="si">{</span><span class="n">video_name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;(flipped dorsal-ventral)&#39;</span> <span class="k">if</span> <span class="n">flipped</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="kn">import</span> <span class="nn">argparse</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
+
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;dataset_path&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--eigenworms_matrix_path&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Path to optional eigenworms matrix to also save results in eigenworm modes&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--work_dir&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Root folder for all experiments&quot;</span><span class="p">)</span>
+    <span class="n">add_config_argument</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--max_gap_size&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Interpolate over missing values (gaps), as long&quot;</span>
+        <span class="s2">&quot;as the consecutive length of the missing values is less than max_gap_size (frames)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--min_segment_size&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Only segments of valid values of length greater than min_segment_size (frames)&quot;</span>
+        <span class="s2">&quot;will be interpolated and smoothed&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--smoothing_window&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;smoothing window in frames&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--poly_order&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;polynomial order in smoothing&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--temp_dir&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Where to store temporary intermediate results&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--num_process&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;How many worker processes&quot;</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="n">post_process</span><span class="p">(</span><span class="o">**</span><span class="nb">vars</span><span class="p">(</span><span class="n">args</span><span class="p">))</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

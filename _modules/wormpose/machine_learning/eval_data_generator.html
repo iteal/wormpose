@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wormpose.machine_learning.eval_data_generator &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for wormpose.machine_learning.eval_data_generator</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Generates evaluation data: random real processed images with labels and save them to a Tfrecord file</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">csv</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">wormpose.dataset</span> <span class="kn">import</span> <span class="n">Dataset</span>
+<span class="kn">from</span> <span class="nn">wormpose.images.real_dataset</span> <span class="kn">import</span> <span class="n">RealDataset</span>
+<span class="kn">from</span> <span class="nn">wormpose.machine_learning</span> <span class="kn">import</span> <span class="n">tfrecord_file</span>
+<span class="kn">from</span> <span class="nn">wormpose.pose.centerline</span> <span class="kn">import</span> <span class="n">skeleton_to_angle</span><span class="p">,</span> <span class="n">flip_theta</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">()</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="generate"><a class="viewcode-back" href="../../../_autosummary/wormpose.machine_learning.eval_data_generator.html#wormpose.machine_learning.eval_data_generator.generate">[docs]</a><span class="k">def</span> <span class="nf">generate</span><span class="p">(</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">Dataset</span><span class="p">,</span>
+    <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">theta_dims</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">file_pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates evaluation dataset composed of processed real images, saved to a .TFrecord</span>
+
+<span class="sd">    :param dataset: WormPose Dataset</span>
+<span class="sd">    :param num_samples: How many images to generate</span>
+<span class="sd">    :param theta_dims: Dimensions of theta for the labels</span>
+<span class="sd">    :param file_pattern: Path of the output files with &quot;index&quot; variable</span>
+<span class="sd">        example: &quot;path_to_out/eval_{index}.tfrecord&quot;</span>
+<span class="sd">    :return: How many samples where actually generated (if there is less data than the requested num_samples)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">labelled_frames</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">video_name</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">video_names</span><span class="p">:</span>
+        <span class="n">skel_is_not_nan</span> <span class="o">=</span> <span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span><span class="o">.</span><span class="n">skeletons</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">labelled_indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">skel_is_not_nan</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">labelled_indexes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">labelled_frames</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">labelled_indexes</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">labelled_frames</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Can&#39;t create evaluation data because couldn&#39;t find any labelled frame in the dataset.&quot;</span><span class="p">)</span>
+
+    <span class="n">len_labelled_frames</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">labelled_frames</span><span class="o">.</span><span class="n">values</span><span class="p">()]))</span>
+    <span class="k">if</span> <span class="n">len_labelled_frames</span> <span class="o">&lt;</span> <span class="n">num_samples</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Not enough labelled frames in the dataset &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;to create an evaluation set of </span><span class="si">{</span><span class="n">num_samples</span><span class="si">}</span><span class="s2"> unique samples, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;using all available </span><span class="si">{</span><span class="n">len_labelled_frames</span><span class="si">}</span><span class="s2"> samples instead.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">num_samples</span> <span class="o">=</span> <span class="n">len_labelled_frames</span>
+
+    <span class="n">real_dataset</span> <span class="o">=</span> <span class="n">RealDataset</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">frame_preprocessing</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">image_shape</span><span class="p">)</span>
+
+    <span class="n">tfrecord_filename</span> <span class="o">=</span> <span class="n">file_pattern</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">csv_infos_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">tfrecord_filename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;.csv&quot;</span>
+
+    <span class="c1"># get num_samples total random labelled frames from the videos</span>
+    <span class="n">eval_frames</span> <span class="o">=</span> <span class="n">_populate_eval_frames</span><span class="p">(</span><span class="n">labelled_frames</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">)</span>
+
+    <span class="c1"># write the eval.tfrecord file with the images and the labels, save also the source infos in a separate eval.csv</span>
+    <span class="c1"># the frames are not shuffled by video, all the frames from one video are consecutive in the file</span>
+    <span class="k">with</span> <span class="n">tfrecord_file</span><span class="o">.</span><span class="n">Writer</span><span class="p">(</span><span class="n">tfrecord_filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">record_writer</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">csv_infos_filename</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">csv_file</span><span class="p">:</span>
+        <span class="n">csv_writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">csv_file</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="n">quotechar</span><span class="o">=</span><span class="s2">&quot;|&quot;</span><span class="p">,</span> <span class="n">quoting</span><span class="o">=</span><span class="n">csv</span><span class="o">.</span><span class="n">QUOTE_MINIMAL</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">video_name</span><span class="p">,</span> <span class="n">cur_video_eval_indexes</span> <span class="ow">in</span> <span class="n">eval_frames</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+
+            <span class="k">with</span> <span class="n">dataset</span><span class="o">.</span><span class="n">frames_dataset</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">video_name</span><span class="p">)</span> <span class="k">as</span> <span class="n">frames</span><span class="p">:</span>
+
+                <span class="k">for</span> <span class="n">eval_frame_index</span> <span class="ow">in</span> <span class="n">cur_video_eval_indexes</span><span class="p">:</span>
+                    <span class="n">image_data</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">real_dataset</span><span class="o">.</span><span class="n">process_frame</span><span class="p">(</span><span class="n">frames</span><span class="p">[</span><span class="n">eval_frame_index</span><span class="p">])</span>
+                    <span class="n">cur_skel</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">features_dataset</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span><span class="o">.</span><span class="n">skeletons</span><span class="p">[</span><span class="n">eval_frame_index</span><span class="p">]</span>
+                    <span class="n">cur_theta</span> <span class="o">=</span> <span class="n">skeleton_to_angle</span><span class="p">(</span><span class="n">cur_skel</span><span class="p">,</span> <span class="n">theta_dims</span><span class="o">=</span><span class="n">theta_dims</span><span class="p">)</span>
+                    <span class="n">cur_theta_flipped</span> <span class="o">=</span> <span class="n">flip_theta</span><span class="p">(</span><span class="n">cur_theta</span><span class="p">)</span>
+
+                    <span class="n">record_writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span> <span class="n">cur_theta</span><span class="p">,</span> <span class="n">cur_theta_flipped</span><span class="p">)</span>
+                    <span class="n">csv_writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="n">video_name</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">eval_frame_index</span><span class="p">)])</span>
+
+    <span class="k">return</span> <span class="n">num_samples</span></div>
+
+
+<span class="k">def</span> <span class="nf">_populate_eval_frames</span><span class="p">(</span><span class="n">labelled_frames</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="n">cur_index</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">eval_frames</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">while</span> <span class="n">cur_index</span> <span class="o">&lt;</span> <span class="n">num_samples</span><span class="p">:</span>
+        <span class="c1"># pick randomly a video name and a valid frame index for that video, without repetition</span>
+        <span class="n">chosen_video_name</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">labelled_frames</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+        <span class="n">valid_index_in_video</span> <span class="o">=</span> <span class="n">labelled_frames</span><span class="p">[</span><span class="n">chosen_video_name</span><span class="p">]</span>
+        <span class="n">pick_index_at</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">valid_index_in_video</span><span class="p">))</span>
+        <span class="n">chosen_frame_index</span> <span class="o">=</span> <span class="n">valid_index_in_video</span><span class="p">[</span><span class="n">pick_index_at</span><span class="p">]</span>
+        <span class="c1"># remove chosen frame from the available frames</span>
+        <span class="n">labelled_frames</span><span class="p">[</span><span class="n">chosen_video_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">labelled_frames</span><span class="p">[</span><span class="n">chosen_video_name</span><span class="p">],</span> <span class="n">pick_index_at</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">labelled_frames</span><span class="p">[</span><span class="n">chosen_video_name</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">labelled_frames</span><span class="p">[</span><span class="n">chosen_video_name</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">chosen_video_name</span> <span class="ow">in</span> <span class="n">eval_frames</span><span class="p">:</span>
+            <span class="n">eval_frames</span><span class="p">[</span><span class="n">chosen_video_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">chosen_frame_index</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">eval_frames</span><span class="p">[</span><span class="n">chosen_video_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">chosen_frame_index</span><span class="p">]</span>
+        <span class="n">cur_index</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="c1"># sort for faster read access</span>
+    <span class="k">for</span> <span class="n">video_name</span> <span class="ow">in</span> <span class="n">eval_frames</span><span class="p">:</span>
+        <span class="n">eval_frames</span><span class="p">[</span><span class="n">video_name</span><span class="p">]</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">eval_frames</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../custom_loader.html">Load custom data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

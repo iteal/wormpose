@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Load custom data &#8212; WormPose  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Documentation of WormPose." href="documentation.html" />
+    <link rel="prev" title="Use with Tierpsy tracker" href="tierpsy.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="load-custom-data">
+<h1>Load custom data<a class="headerlink" href="#load-custom-data" title="Permalink to this headline">¶</a></h1>
+<section id="toy-dataset-example">
+<h2>Toy dataset example<a class="headerlink" href="#toy-dataset-example" title="Permalink to this headline">¶</a></h2>
+<p>An example of implementing a custom dataset loader is available
+<a class="reference external" href="https://github.com/iteal/wormpose/tree/main/examples/toy_dataset">here</a>
+(using toy data).</p>
+<p>First install the WormPose package.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --upgrade wormpose
+</pre></div>
+</div>
+<p>To install the toy dataset loader, run the following command in the
+folder <code class="docutils literal notranslate"><span class="pre">toy_dataset</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install -e .
+</pre></div>
+</div>
+<p>Now you can use the dataset loader named “toy” :</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose COMMAND toy <span class="s2">&quot;toy_dataset_path&quot;</span>
+</pre></div>
+</div>
+<p>Toy data will be generated at runtime and saved to toy_dataset_path.</p>
+</section>
+<section id="use-your-own-data">
+<h2>Use your own data<a class="headerlink" href="#use-your-own-data" title="Permalink to this headline">¶</a></h2>
+<p>Follow the toy dataset example to add your custom dataset loader.</p>
+<p>First, choose a name for your dataset loader (<code class="docutils literal notranslate"><span class="pre">cool_worms</span></code> for
+example).</p>
+<p>Create a python module (<code class="docutils literal notranslate"><span class="pre">cool_worms_loader.py</span></code> for example),
+containing three classes, such as below:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">wormpose</span> <span class="kn">import</span> <span class="n">BaseFramesDataset</span><span class="p">,</span> <span class="n">BaseFeaturesDataset</span><span class="p">,</span> <span class="n">BaseFramePreprocessing</span>
+
+<span class="k">class</span> <span class="nc">FramesDataset</span><span class="p">(</span><span class="n">BaseFramesDataset</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reader for the images of the dataset</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Here, implement interface BaseFramesDataset&quot;</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">FeaturesDataset</span><span class="p">(</span><span class="n">BaseFeaturesDataset</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Features corresponding to the images (skeleton, width)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Here, implement interface BaseFeaturesDataset&quot;</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">FramePreprocessing</span><span class="p">(</span><span class="n">BaseFramePreprocessing</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Contains a function to segment the worm in images and return the background color</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Here, implement interface BaseFramePreprocessing&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The API documentation can be found
+<a class="reference external" href="https://github.com/iteal/wormpose/blob/main/wormpose/dataset/base_dataset.py">here</a>.</p>
+<p>Create a file <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> containing the entry point
+<code class="docutils literal notranslate"><span class="pre">worm_dataset_loaders</span></code> refering to your python module, with its loader
+name, such as below:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">setuptools</span> <span class="kn">import</span> <span class="n">setup</span>
+
+<span class="n">setup</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;cool_worms_dataset&quot;</span><span class="p">,</span>
+      <span class="n">entry_points</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;worm_dataset_loaders&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;cool_worms=cool_worms_loader&quot;</span><span class="p">]})</span>
+</pre></div>
+</div>
+<p>After installing wormpose, install your module with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install -e .
+</pre></div>
+</div>
+<p>Now you can use the dataset loader named “cool_worms” :</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wormpose COMMAND cool_worms <span class="s2">&quot;path/to/cool_worms_dataset000XX&quot;</span>
+</pre></div>
+</div>
+<p>Use the notebook
+<a class="reference external" href="https://github.com/iteal/wormpose/blob/main/examples/check_dataset.ipynb">check_dataset</a>
+to validate your custom dataset loader. You can view if the frames load
+correctly, and if the features are accurate.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">WormPose</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=iteal&repo=wormpose&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pipeline.html">WormPose pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tierpsy.html">Use with Tierpsy</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Load custom data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#toy-dataset-example">Toy dataset example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#use-your-own-data">Use your own data</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="tierpsy.html" title="previous chapter">Use with Tierpsy tracker</a></li>
+      <li>Next: <a href="documentation.html" title="next chapter">Documentation of WormPose.</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Okinawa Institute of Science and Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/custom_loader.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
